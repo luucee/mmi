@@ -1,6 +1,4 @@
 
-
-
 mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0.15,ncore=4,S=5,nboot=100,bfrac=0.8,sig=0.05) {
   # mexp - matrice di espressione (geni sulle righe, samples sulle colonne)
   # tf - lista dei TF (deve essere un sottoinsieme di rownames(mexp))
