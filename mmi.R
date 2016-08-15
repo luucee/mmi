@@ -92,10 +92,10 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     
     for (bi in 1:nboot) {
       for (k in 1:length(range)) {
-        mi1k[,,as.character(k),bi] = tmp[[bi]][[k]]$MI1k
-        miall[,,as.character(k),bi] = tmp[[bi]][[k]]$MIall
+        mi1k[,,as.character(range[k]),bi] = tmp[[bi]][[k]]$MI1k
+        miall[,,as.character(range[k]),bi] = tmp[[bi]][[k]]$MIall
         if(!positiveOnly) {
-          mikn[,,as.character(k),bi] = tmp[[bi]][[k]]$MIkn
+          mikn[,,as.character(range[k]),bi] = tmp[[bi]][[k]]$MIkn
         }
       }
     }
