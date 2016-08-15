@@ -100,8 +100,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
       }
     }
     
-    if(!verbose) setTxtProgressBar(pb, ri)
-    ri = ri + 1
+
   
     # calcolo il rapporto tra le medie delle MI tra i due sample boot
     # per ogni TF-target-k
@@ -157,7 +156,10 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     names(tmp) = tf
     tfmod[[x]] = tmp
     if(verbose) {
-      print(paste0(x," takes ",ptm - proc.time()[3]," sec. "))
+      print(paste0(x," takes ",proc.time()[3]-ptm," sec. "))
+    } else {
+      setTxtProgressBar(pb, ri)
+      ri = ri + 1
     }
   }
   close(pb)

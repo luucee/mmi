@@ -56,9 +56,9 @@ kordering = t(apply(M[modulators,],1,order,decreasing=T))
 colnames(kordering) = colnames(M)
 library(foreach)
 library(doParallel)
-cl = makeCluster(4)
+cl = makeCluster(30)
 registerDoParallel(cl)
-out = mmi(M,tf = tf,target = target,kordering = kordering,nboot=10,positiveOnly=F,S=2000,sig = 0.01,cl=cl)
+out = mmi(M,tf = tf,target = target,kordering = kordering,nboot=100,positiveOnly=F,S=200,sig = 0.01,cl=cl)
 stopCluster(cl)
 
 # test prediction performance
