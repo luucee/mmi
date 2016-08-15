@@ -61,7 +61,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
   # lista dei geni modulatori (cofattori o target). Per ogni modulatore una matrice 
   tfmod = list()
   
-  pb = txtProgressBar(min=1,max=nrow(kordering)*nboot*length(range),style=3) 
+  if(!verbose) pb = txtProgressBar(min=1,max=nrow(kordering),style=3) 
   ri = 1 # contatore per la progress bar
   for (x in rownames(kordering)) {
     # per ogni modulatore candidato x-esimo
@@ -69,31 +69,45 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     mi1k = array(0,dim=c(length(tf),length(target),length(range),nboot),dimnames=list(tf,target,range)) 
     if (!positiveOnly) mikn = mi1k 
     miall = mi1k
-    for (bi in 1:nboot) {
-      
-      for(k in range) {
-        ptm = proc.time()[3]
+    ptm = proc.time()[3]
+    tmp = foreach (bi = 1:nboot) %:%
+      foreach(k = range) %dopar% {
+        retval = list()
         ksample = sample(1:k,k*bfrac)
-        mi1k[,,as.character(k),bi] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-        mi1k[,,as.character(k),bi][mi1k[,,as.character(k),bi]<0] = 0
-
+        tmp.mi1k = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
+        tmp.mi1k[tmp.mi1k<0] = 0
+        
+        tmp.mikn=NULL
         if(!positiveOnly) {
           ksample = sample((ncol(kordering)-k):ncol(kordering),k*bfrac)
-          mikn[,,as.character(k),bi] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-          mikn[,,as.character(k),bi][mikn[,,as.character(k),bi]<0] = 0
+          tmp.mikn = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
+          tmp.mikn[tmp.mikn<0] = 0
         }
         
         # null
         ksample = sample(1:ncol(kordering),k*bfrac)
-        miall[,,as.character(k),bi] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-        miall[,,as.character(k),bi][miall[,,as.character(k),bi]<0] = 0
-        if (verbose) print(proc.time()[3] - ptm)
-        setTxtProgressBar(pb, ri)
-        ri = ri + 1
+        tmp.miall = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
+        tmp.miall[tmp.miall<0] = 0
+        
+        retval = list(MI1k=tmp.mi1k,MIkn=tmp.mikn,MIall=tmp.miall)
+        retval
       }
-
+    
+    for (bi in 1:nboot) {
+      for (k in 1:length(range)) {
+        mi1k[,,as.character(k),bi] = tmp[[bi]][[k]]$MI1k
+        miall[,,as.character(k),bi] = tmp[[bi]][[k]]$MIall
+        if(!positiveOnly) {
+          mikn[,,as.character(k),bi] = tmp[[bi]][[k]]$MIkn
+        }
+      }
     }
     
+    if(verbose) print(ptm - proc.time()[3])
+    
+    if(!verbose) setTxtProgressBar(pb, ri)
+    ri = ri + 1
+  
     # calcolo il rapporto tra le medie delle MI tra i due sample boot
     # per ogni TF-target-k
     midelta1k=log2(apply(mi1k,c(1,2,3),sum)/apply(miall,c(1,2,3),sum))
