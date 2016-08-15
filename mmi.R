@@ -39,12 +39,6 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
   if ( length(intersect(colnames(kordering),colnames(mexp))) != ncol(mexp) ) 
     stop("colnames(kordering) must be equal to colnames(mexp)")
   
-  if(verbose) {
-    print(paste0("matrix dim: ",dim(mexp)))
-    print(paste0("N° targets: ",length(target)))
-    print(paste0("N° modulators: ",nrow(kordering)))
-    print(paste0("N° TF: ",length(tf)))
-  }
   
   cl<-makeCluster(ncore)
   registerDoParallel(cl)  
@@ -54,6 +48,14 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
   inizio = round(ncol(kordering)*ignore)
   range= inizio:(ncol(kordering)-inizio)
   range = range[seq(1,length(range),S)] # prendo ogni S sample per ridurre il numero di k da controllare
+  
+  if(verbose) {
+    print(paste0("Exp Matrix: ",paste0(dim(mexp),collapse="x")))
+    print(paste0("N° targets: ",length(target)))
+    print(paste0("N° modulators: ",nrow(kordering)))
+    print(paste0("N° TF: ",length(tf)))
+    print(paste0("Testing N° samples: ",length(range)))
+  }
   
   # struttura dati ritornata
   # lista dei geni modulatori (cofattori o target). Per ogni modulatore una matrice 

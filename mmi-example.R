@@ -42,6 +42,7 @@ target = setdiff(rownames(M),c(tf,modulators))
 # Prendo solo i target che hanno un motif di qualche TF sul promotore
 load("motifRanges.Rdata")
 motifRanges=motifRanges[motifRanges$qvalue<=0.05]
+
 sum(tf %in% motifRanges$TF)
 trg=unique(motifRanges$TARGET[motifRanges$TF %in% tf])
 trg=trg[trg %in% rownames(M)]
