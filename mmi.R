@@ -40,9 +40,9 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     stop("colnames(kordering) must be equal to colnames(mexp)")
   
   if(verbose) {
-    print(paste0("matrix dim: ",dim(mex)))
+    print(paste0("matrix dim: ",dim(mexp)))
     print(paste0("N° targets: ",length(target)))
-    print(paste0("N° modulators: ",nrow(kordeing)))
+    print(paste0("N° modulators: ",nrow(kordering)))
     print(paste0("N° TF: ",length(tf)))
   }
   
