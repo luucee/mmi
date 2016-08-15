@@ -72,7 +72,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     for (bi in 1:nboot) {
       
       for(k in range) {
-        cat(x,bi,k,"\n")
+        ptm = proc.time()
         ksample = sample(1:k,k*bfrac)
         mi1k[,,as.character(k),bi] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
         mi1k[,,as.character(k),bi][mi1k[,,as.character(k),bi]<0] = 0
@@ -87,11 +87,10 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
         ksample = sample(1:ncol(kordering),k*bfrac)
         miall[,,as.character(k),bi] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
         miall[,,as.character(k),bi][miall[,,as.character(k),bi]<0] = 0
-        
+        if (verbose) print(proc.time() - ptm)
         setTxtProgressBar(pb, ri)
         ri = ri + 1
       }
-      
 
     }
     
