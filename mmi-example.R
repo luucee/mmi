@@ -39,12 +39,20 @@ tf = tf[tf %in% rownames(M)]
 
 target = setdiff(rownames(M),c(tf,modulators))
 
-# prova con pochi
-target= sample(target,1000)
+# Prendo solo i target che hanno un motif di qualche TF sul promotore
+load("motifRanges.Rdata")
+motifRanges=motifRanges[motifRanges$qvalue<=0.05]
+sum(tf %in% motifRanges$TF)
+trg=unique(motifRanges$TARGET[motifRanges$TF %in% tf])
+trg=trg[trg %in% rownames(M)]
+length(trg)
+tf = tf[tf %in% motifRanges$TF]
+target = trg
+
 #modulators=sample(modulators,3)
 kordering = t(apply(M[modulators,],1,order,decreasing=T))
 colnames(kordering) = colnames(M)
-out = mmi(M,tf = tf,target = target,kordering = kordering,nboot=100,positiveOnly=F,S=10,sig = 0.01,ncore=50)
+out = mmi(M,tf = tf,target = target,kordering = kordering,nboot=100,positiveOnly=F,S=200,sig = 0.01,ncore=50)
 
 
 # test prediction performance
