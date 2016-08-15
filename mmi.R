@@ -1,5 +1,5 @@
 
-mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0.15,ncore=4,S=5,nboot=100,bfrac=0.8,sig=0.05, verbose=T) {
+mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0.15,S=5,nboot=100,bfrac=0.8,sig=0.05, verbose=T,cl=NULL) {
   # mexp - matrice di espressione (geni sulle righe, samples sulle colonne)
   # tf - lista dei TF (deve essere un sottoinsieme di rownames(mexp))
   # target - lista dei target (deve essere un sottoinsieme di rownames(mexp)\tf)
@@ -25,8 +25,6 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
   # sig - livello di significativita per filtrare i risultati
   
   require(parmigene)
-  library(foreach)
-  library(doParallel)
   # precondition controls
   if (!is.matrix(mexp)) 
     stop("mexp must be a matrix")
@@ -40,8 +38,6 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     stop("colnames(kordering) must be equal to colnames(mexp)")
   
   
-  cl<-makeCluster(ncore)
-  registerDoParallel(cl)  
 
   # ignoro il controllo di un range iniziale e finale con pochi sample
   # mi aspetto che il k risieda piu internamente
@@ -104,8 +100,6 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
       }
     }
     
-    if(verbose) print(ptm - proc.time()[3])
-    
     if(!verbose) setTxtProgressBar(pb, ri)
     ri = ri + 1
   
@@ -162,8 +156,10 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
       }
     names(tmp) = tf
     tfmod[[x]] = tmp
+    if(verbose) {
+      print(paste0(x," takes ",ptm - proc.time()[3]," sec. "))
+    }
   }
-  stopCluster(cl)
   close(pb)
   return(tfmod)
 }

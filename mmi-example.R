@@ -54,8 +54,12 @@ target = trg
 #modulators=sample(modulators,3)
 kordering = t(apply(M[modulators,],1,order,decreasing=T))
 colnames(kordering) = colnames(M)
-out = mmi(M,tf = tf,target = target,kordering = kordering,nboot=100,positiveOnly=F,S=200,sig = 0.01,ncore=50)
-
+library(foreach)
+library(doParallel)
+cl<-makeCluster(ncore)
+registerDoParallel(cl)
+out = mmi(M,tf = tf,target = target,kordering = kordering,nboot=100,positiveOnly=F,S=200,sig = 0.01,ncore=50,cl=cl)
+stopCluster(cl)
 
 # test prediction performance
 
