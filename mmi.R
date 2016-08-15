@@ -72,6 +72,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     ptm = proc.time()[3]
     tmp = foreach (bi = 1:nboot) %:%
       foreach(k = range) %dopar% {
+        require(parmigene)
         retval = list()
         ksample = sample(1:k,k*bfrac)
         tmp.mi1k = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
