@@ -162,7 +162,66 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
       ri = ri + 1
     }
   }
-  close(pb)
   return(tfmod)
 }
+
+
+
+svm.mod = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0.15,S=5,nboot=100,bfrac=0.8,sig=0.05, verbose=T,cl=NULL) {
+  # mexp - matrice di espressione (geni sulle righe, samples sulle colonne)
+  # tf - lista dei TF (deve essere un sottoinsieme di rownames(mexp))
+  # target - lista dei target (deve essere un sottoinsieme di rownames(mexp)\tf)
+  # kordering - matrice degli ordinamenti dei samples dei geni ritenuti modulatori
+  #             (rownames(kordering) deve essere un sottinsieme di rownames(mexp))
+  #             (colnames(kordering) deve essere identico a colnames(mexp)))
+  #             Es.
+  #             kordering fatto sulla metilazione dei target (mmet matrice di metilazione con matched samples)
+  #             kordering = t(apply(mmet[target,],1,order,decreasing=F))
+  #             in questo caso ha senso solo alltarget=FALSE e positiveOnly=T
+  #
+  #             kordering fatto sulla espressione di cofattori che modulano la regolazione TF->target
+  #             kordering = t(apply(mexp[cofactors,],1,order,decreasing=F))
+  #             in questo caso ha senso alltarget=TRUE e positiveOnly=F
+  # alltarget - se uguale a TRUE (default) la mutua inf è calcolata su tutti i target, se FALSE è calcolata solo sul modulatore corrente 
+  #             (utile nel caso di kordering fatto sulla metilazione dei target)
+  # positiveOnly - se uguale a TRUE (default) effettua solo il test (1..k) vs all, altrimenti considera anche l'inverso (k..n) vs all
+  # ignore - percentuale dei sample esterni da ignorare quando si calcola la MI
+  # ncore - numero di core per sfruttare il calcolo parallelo
+  # S - numero di samples da raggruppare per la ricerca di k (T=1 il test è fatto per ogni sample)
+  # nboot - numero di bootstrap per generare le distribuzioni
+  # bfrac - frazione dei sample per il bootstrap
+  # sig - livello di significativita per filtrare i risultati
+  require(kernlab)
+  
+  for (x in rownames(kordering)) {
+    # per ogni modulatore candidato x-esimo
+    # generazione del training sample
+    kordering[x,]
+  tpos = NULL
+  tneg = NULL
+  for(i in 1:100) {
+    trgi = sample(1:nrow(mexp),1)
+    ptrg = sort(sample(mexp[trgi,],length(A)))
+    ptrg[order(mexp[tfi,A])] = ptrg
+    mvec = sort(mmet[trgi,])
+    evec = sort(mexp[trgi,])
+    tpos=rbind(tpos,c(ptrg,
+                      sample(evec[1:length(B)]),
+                      sample(mvec[1:length(A)]),
+                      sample(mvec[(length(A)+1):length(mvec)])))
+    
+    
+    #trgi = sample(1:nrow(mexp),1)
+    ntrg=c(sample(mexp[trgi,A]),sample(mmet[trgi,]))
+    tneg=rbind(tneg,c(sample(mexp[trgi,A]),
+                      sample(mexp[trgi,],length(B)),
+                      sample(mmet[trgi,])))
+  }
+  rownames(tpos)=NULL
+  rownames(tneg)=NULL
+  }
+  
+}
+
+
 
