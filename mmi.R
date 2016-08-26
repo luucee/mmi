@@ -102,7 +102,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     
 
   
-    # calcolo il rapporto tra le medie delle MI tra i due sample boot
+    # calcolo il log2 del rapporto tra le medie delle MI tra i due sample boot
     # per ogni TF-target-k
     midelta1k=log2(apply(mi1k,c(1,2,3),sum)/apply(miall,c(1,2,3),sum))
     mipval1k = midelta1k*0+1
@@ -112,7 +112,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     }
     
     # effettuo il test tra i due sample boot
-    # per ogni TF-target-k sia direct che inverse
+    # per ogni TF-target al sample k-esimo sia direct (positiveOnly==T) che inverse
     for(i in tf) {
       mipval1k[i,,] = foreach(t=target, .combine='rbind') %:% 
         foreach(j=as.character(range), .combine='c') %dopar% {
