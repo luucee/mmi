@@ -102,4 +102,21 @@ for(i in names(tfpred)) {
   plot(perf)
 }
 
+load("out.Rdata")
+
+g="STAT3"
+m="EGFR"; m2 = "BTK"
+m %in% mod[[g]]
+m2 %in% mod[[g]]
+w=(out[[m]]$DELTA1k[g,,]>1 & out[[m]]$PVAL1k[g,,]<0.0001) | out[[m]]$DELTAkn[g,,]>1 & out[[m]]$PVALkn[g,,]<0.0001
+w=w[rownames(w) != m,]
+rcol=rep("red",nrow(w))
+rcol[rownames(w) %in% trg[[g]]]="blue"
+require(gplots)
+heatmap.2(w*1,dendrogram="row",Colv=F,RowSideColors=rcol,density.info="none",trace="none",scale="none")
+
+
+
+
+
 

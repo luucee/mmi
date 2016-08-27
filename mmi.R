@@ -61,6 +61,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     print(paste0("N° modulators: ",nrow(kordering)))
     print(paste0("N° TF: ",length(tf)))
     print(paste0("Testing N° samples: ",length(range)))
+    print(paste0("N° boots: ",nboot))
   }
   
   # struttura dati ritornata
@@ -114,13 +115,14 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
   
     # calcolo il cohen's d effect size tra i due bootstrap
     # per ogni TF-target-k
-    midelta1k = (apply(mi1k,c(1,2,3),mean)-apply(miall,c(1,2,3),mean))/sqrt((apply(mi1k,c(1,2,3),var)+apply(miall,c(1,2,3),var))/2)
+    #midelta1k = (apply(mi1k,c(1,2,3),mean)-apply(miall,c(1,2,3),mean))/sqrt((apply(mi1k,c(1,2,3),var)+apply(miall,c(1,2,3),var))/2)
+    midelta1k = log2(apply(mi1k,c(1,2,3),sum)/apply(miall,c(1,2,3),sum))
     mipval1k = midelta1k*0+1
     mipvalkn=NULL
     mideltakn=NULL
     if (!positiveOnly) {
-      mideltakn = (apply(mikn,c(1,2,3),mean)-apply(miall,c(1,2,3),mean))/sqrt((apply(mikn,c(1,2,3),var)+apply(miall,c(1,2,3),var))/2)
-      #mideltakn=log2(apply(mikn,c(1,2,3),sum)/apply(miall,c(1,2,3),sum))
+      #mideltakn = (apply(mikn,c(1,2,3),mean)-apply(miall,c(1,2,3),mean))/sqrt((apply(mikn,c(1,2,3),var)+apply(miall,c(1,2,3),var))/2)
+      mideltakn=log2(apply(mikn,c(1,2,3),sum)/apply(miall,c(1,2,3),sum))
       mipvalkn = mideltakn*0+1
     }
     
@@ -132,7 +134,8 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
           if (i==t) {
             1
           } else {
-            t.test(mi1k[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
+            #t.test(mi1k[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
+            wilcox.test(mi1k[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
           }
         }
       if (!positiveOnly) {
@@ -141,7 +144,8 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
             if (i==t) {
               1
             } else {
-              t.test(mikn[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
+              #t.test(mikn[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
+              wilcox.test(mikn[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
             }
           }
       }
