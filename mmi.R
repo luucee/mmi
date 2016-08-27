@@ -82,8 +82,8 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     miall = mi1k
     minull = mi1k
     ptm = proc.time()[3]
-    tmp = foreach (bi = 1:nboot) %:%
-      foreach(k = range) %dopar% {
+    tmp = foreach (k = range) %:%
+      foreach(bi = 1:nboot) %dopar% {
         require(parmigene)
         retval = list()
         ksample = sample(1:k,sbin*bfrac)
@@ -112,11 +112,11 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     
     for (bi in 1:nboot) {
       for (k in 1:length(range)) {
-        mi1k[,,as.character(range[k]),bi] = tmp[[bi]][[k]]$MI1k
-        miall[,,as.character(range[k]),bi] = tmp[[bi]][[k]]$MIall
-        minull[,,as.character(range[k]),bi] = tmp[[bi]][[k]]$MInull
+        mi1k[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MI1k
+        miall[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MIall
+        minull[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MInull
         if(!positiveOnly) {
-          mikn[,,as.character(range[k]),bi] = tmp[[bi]][[k]]$MIkn
+          mikn[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MIkn
         }
       }
     }

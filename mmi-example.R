@@ -64,7 +64,7 @@ library(foreach)
 library(doParallel)
 cl = makePSOCKcluster(10)
 registerDoParallel(cl)
-out = mmi(M,tf = tf,target = targets,kordering = kordering,nboot=100,positiveOnly=F,S=100,sig = 0.01,cl=cl)
+out = mmi(M,tf = tf,target = targets,kordering = kordering,nboot=1000,positiveOnly=F,S=4,sig = 0.01,cl=cl)
 stopCluster(cl)
 
 # test prediction performance
