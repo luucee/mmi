@@ -119,7 +119,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     
 
     #azzero con la soglia
-    misoglia=apply(mikn,c(1,2,3),max)
+    misoglia=apply(minull,c(1,2,3),max)
     
     # calcolo il cohen's d effect size tra i due bootstrap
     # per ogni TF-target-k
