@@ -55,7 +55,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
   #range= inizio:(ncol(kordering)-inizio)
   #range = range[seq(1,length(range),S)] # prendo ogni S sample per ridurre il numero di k da controllare
   sbin = ncol(kordering) %/% S
-  range = seq(1,ncol(kordering),sbin)
+  range = seq(0,ncol(kordering),sbin)
   range = range[-1]
   if ((sbin*S)<=ncol(kordering)) {
     range = range[-length(range)]
