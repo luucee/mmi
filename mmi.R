@@ -82,19 +82,19 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
         retval = list()
         ksample = sample(1:k,k*bfrac)
         tmp.mi1k = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-        tmp.mi1k[tmp.mi1k<0] = 0
+        #tmp.mi1k[tmp.mi1k<0] = 0
         
         tmp.mikn=NULL
         if(!positiveOnly) {
           ksample = sample((ncol(kordering)-k):ncol(kordering),k*bfrac)
           tmp.mikn = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-          tmp.mikn[tmp.mikn<0] = 0
+          #tmp.mikn[tmp.mikn<0] = 0
         }
         
         # null
         ksample = sample(1:ncol(kordering),k*bfrac)
         tmp.miall = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-        tmp.miall[tmp.miall<0] = 0
+        #tmp.miall[tmp.miall<0] = 0
         
         retval = list(MI1k=tmp.mi1k,MIkn=tmp.mikn,MIall=tmp.miall)
         retval
@@ -129,12 +129,20 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     for(i in tf) {
       mipval1k[i,,] = foreach(t=target, .combine='rbind') %:% 
         foreach(j=as.character(range), .combine='c') %dopar% {
-          t.test(mi1k[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
+          if (i==t) {
+            1
+          } else {
+            t.test(mi1k[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
+          }
         }
       if (!positiveOnly) {
         mipvalkn[i,,] = foreach(t=target, .combine='rbind') %:% 
           foreach(j=as.character(range), .combine='c') %dopar% {
-            t.test(mikn[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
+            if (i==t) {
+              1
+            } else {
+              t.test(mikn[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
+            }
           }
       }
     }

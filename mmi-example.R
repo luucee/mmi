@@ -12,14 +12,22 @@ source("mmi.R")
 load(file="ATLAS_dataset.Rdata",verbose=T)
 
 # Recupero goldstandard dalle tabelle del paper
-t=read.table("pathways-genes.txt",sep="\t",header=F,stringsAsFactors = F)
-pwg=strsplit(t$V2,", ")
-names(pwg) = t$V1
-t=read.table("tf-pathways.txt",sep="\t",header=F,stringsAsFactors = F)
-tfpw=lapply(strsplit(t$V2,", "),function(x) gsub(" \\(.*\\)","",x))
-names(tfpw) = t$V1
-tfmodulators = tfpw
-tfmodulators = lapply(tfmodulators, function(x) unique(unlist(pwg[x])))
+t = read.table("tf-modulators-targets.txt",sep="\t",stringsAsFactors = F)
+t$V2 = gsub("[ |\\n|\\r]","",t$V2)
+t$V3 = gsub("[ |\\n|\\r]","",t$V3)
+trg=strsplit(t$V2,",")
+names(trg) = t$V1
+mod=strsplit(t$V3,",")
+names(mod) = t$V1
+
+#t=read.table("pathways-genes.txt",sep="\t",header=F,stringsAsFactors = F)
+#pwg=strsplit(t$V2,", ")
+#names(pwg) = t$V1
+#t=read.table("tf-pathways.txt",sep="\t",header=F,stringsAsFactors = F)
+#tfpw=lapply(strsplit(t$V2,", "),function(x) gsub(" \\(.*\\)","",x))
+#names(tfpw) = t$V1
+#tfmodulators = tfpw
+#tfmodulators = lapply(tfmodulators, function(x) unique(unlist(pwg[x])))
 
 # rimozione probe con poca variabilita'
 iqr <- apply(mexp, 1, IQR, na.rm = TRUE)
@@ -29,32 +37,25 @@ M <- mexp[selected, ]
 dim(M)
 colnames(M) = paste0("S",1:ncol(M))
 
-# verifica che i geni del goldstandar siano presenti nel dataset
-unique(unlist(tfmodulators)) %in% rownames(M)
-unique(unlist(tfmodulators)) %in% modulators
-names(tfmodulators) %in% rownames(M)
-
-modulators = modulators[modulators %in% rownames(M)]
-tf = tf[tf %in% rownames(M)]
-
-target = setdiff(rownames(M),c(tf,modulators))
-
-
-# prova solo con 3 tf dell'oracolo
-tf = names(tfmodulators)[c(2,4)]
-modulators = c("BTK","LYN","ABL1","ARAF")
+# prova con tf dell'oracolo
+tf = names(mod)
+modulators = c("ABL1","BTK","EGFR") 
+#unique(unlist(mod))
+targets = unique(unlist(trg))
+targets=targets[targets %in% rownames(M)]
+modulators=modulators[modulators %in% rownames(M)]
 
 # Prendo solo i target che hanno un motif di qualche TF sul promotore
-load("motifRanges.Rdata")
-motifRanges
-motifRanges=motifRanges[motifRanges$qvalue<=0.05]
+#load("motifRanges.Rdata")
+#motifRanges
+#motifRanges=motifRanges[motifRanges$qvalue<=0.05]
 
-sum(tf %in% motifRanges$TF)
-trg=unique(motifRanges$TARGET[motifRanges$TF %in% tf])
-trg=trg[trg %in% rownames(M)]
-length(trg)
-tf = tf[tf %in% motifRanges$TF]
-target = trg
+#sum(tf %in% motifRanges$TF)
+#trg=unique(motifRanges$TARGET[motifRanges$TF %in% tf])
+#trg=trg[trg %in% rownames(M)]
+#length(trg)
+#tf = tf[tf %in% motifRanges$TF]
+#target = trg
 
 #modulators=sample(modulators,3)
 kordering = t(apply(M[modulators,],1,order,decreasing=T))
@@ -63,7 +64,7 @@ library(foreach)
 library(doParallel)
 cl = makePSOCKcluster(10)
 registerDoParallel(cl)
-out = mmi(M,tf = tf,target = target,kordering = kordering,nboot=100,positiveOnly=F,S=100,sig = 0.01,cl=cl)
+out = mmi(M,tf = tf,target = targets,kordering = kordering,nboot=100,positiveOnly=F,S=100,sig = 0.01,cl=cl)
 stopCluster(cl)
 
 # test prediction performance
@@ -73,11 +74,11 @@ miomod=modulators[modulators %in% tfmodulators[[miotf]]]
 notmod=setdiff(modulators,miomod)
 
 w=out[[miomod[2]]][[miotf]]
-w=w[w[,"DIRECTION"]==-1,]
+w=w[w[,"DIRECTION"]==1,]
 w=w[order(w[,"DELTA"]*(1-w[,"FDR"]),decreasing=T),]
 w[1:10,]
 w=out[[notmod[2]]][[miotf]]
-w=w[w[,"DIRECTION"]==-1,]
+w=w[w[,"DIRECTION"]==1,]
 w=w[order(w[,"DELTA"]*(1-w[,"FDR"]),decreasing=T),]
 w[1:10,]
 
