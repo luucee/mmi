@@ -1,3 +1,13 @@
+cohens_d <- function(x, y) {
+  lx <- length(x)- 1
+  ly <- length(y)- 1
+  md  <- abs(mean(x) - mean(y))
+  csd <- lx * var(x) + ly * var(y)
+  csd <- csd/(lx + ly)
+  csd <- sqrt(csd)     
+  cd  <- md/csd        
+  return(cd)
+}
 
 mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0.15,S=5,nboot=100,bfrac=0.8,sig=0.05, verbose=T,cl=NULL) {
   # mexp - matrice di espressione (geni sulle righe, samples sulle colonne)
@@ -102,26 +112,29 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     
 
   
-    # calcolo il rapporto tra le medie delle MI tra i due sample boot
+    # calcolo il cohen's d effect size tra i due bootstrap
     # per ogni TF-target-k
-    midelta1k=log2(apply(mi1k,c(1,2,3),sum)/apply(miall,c(1,2,3),sum))
+    midelta1k = (apply(mi1k,c(1,2,3),mean)-apply(miall,c(1,2,3),mean))/sqrt((apply(mi1k,c(1,2,3),var)+apply(miall,c(1,2,3),var))/2)
     mipval1k = midelta1k*0+1
+    mipvalkn=NULL
+    mideltakn=NULL
     if (!positiveOnly) {
-      mideltakn=log2(apply(mikn,c(1,2,3),sum)/apply(miall,c(1,2,3),sum))
+      mideltakn = (apply(mikn,c(1,2,3),mean)-apply(miall,c(1,2,3),mean))/sqrt((apply(mikn,c(1,2,3),var)+apply(miall,c(1,2,3),var))/2)
+      #mideltakn=log2(apply(mikn,c(1,2,3),sum)/apply(miall,c(1,2,3),sum))
       mipvalkn = mideltakn*0+1
     }
     
     # effettuo il test tra i due sample boot
-    # per ogni TF-target-k sia direct che inverse
+    # per ogni TF-target al sample k-esimo sia direct (positiveOnly==T) che inverse
     for(i in tf) {
       mipval1k[i,,] = foreach(t=target, .combine='rbind') %:% 
         foreach(j=as.character(range), .combine='c') %dopar% {
-          wilcox.test(mi1k[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
+          t.test(mi1k[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
         }
       if (!positiveOnly) {
         mipvalkn[i,,] = foreach(t=target, .combine='rbind') %:% 
           foreach(j=as.character(range), .combine='c') %dopar% {
-            wilcox.test(mikn[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
+            t.test(mikn[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
           }
       }
     }
@@ -130,41 +143,71 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     mipval1k[1:length(mipval1k)] = p.adjust(mipval1k[1:length(mipval1k)],method="fdr")
     if (!positiveOnly) mipvalkn[1:length(mipvalkn)] = p.adjust(mipvalkn[1:length(mipvalkn)],method="fdr")
     
-    
-    # per ogni modulatore candidato x-esimo 
-    # selezione del miglior k per ogni coppia TF->target
-    # memorizzo solo le coppie TF-target con pval sig
-    tmp = foreach(i=tf) %:% 
-      foreach(j=target, .combine='rbind') %do% {
-        b1k = which.min(mipval1k[i,j,])
-        pv1k = mipval1k[i,j,b1k]
-        retval=c()
-        if (!positiveOnly) {
-          bkn = which.min(mipvalkn[i,j,])
-          pvkn = mipvalkn[i,j,bkn]
-          if (pvkn <= sig) {
-            retval = rbind(c(FDR=pvkn,DELTA=mideltakn[i,j,bkn],K=as.numeric(names(bkn)),DIRECTION= -1))
-            rownames(retval)=j
-          }
-        }
-        if (pv1k <=sig) {
-          retval = rbind(retval,c(FDR=pv1k,DELTA=midelta1k[i,j,b1k],K=as.numeric(names(b1k)),DIRECTION= +1))
-          rownames(retval)=rep(j,nrow(retval))
-        }
-        retval
-      }
-    names(tmp) = tf
-    tfmod[[x]] = tmp
     if(verbose) {
-      print(paste0(x," takes ",proc.time()[3]-ptm," sec. "))
+      print(paste0(x," took ",proc.time()[3]-ptm," sec. "))
     } else {
       setTxtProgressBar(pb, ri)
       ri = ri + 1
     }
+    
+    tfmod[[x]] = list(TARGET=target,TF=tf,DELTA1k=midelta1k,PVAL1k=mipval1k,DELTAkn=mideltakn,PVALkn=mipvalkn)
   }
   return(tfmod)
 }
 
+delta.clustering = function(tfmod,cutt=0.4) {
+  # per ogni modulatore candidato x-esimo 
+  # e per ogni TF i-esimo effettuo il clustering dei target
+  # rispetto al log2 del rapporto
+  retval = list()
+  for (x in names(tfmod)) {
+    tmp = foreach(i=tfmod[[x]]$TF) %dopar% {
+      hc1k=hclust(tfmod[[x]]$DELTA1k[i,,]*(1-tfmod[[x]]$PVAL1k[i,,]),method = "ward.D2")
+      ct1k=cutree(hc1k,h = cutt)
+      ctkn=NULL
+      if(!is.null(tfmod[[x]]$DELTAkn)) {
+        hckn=hclust(tfmod[[x]]$DELTAkn[i,,]*(1-tfmod[[x]]$PVALkn[i,,]),method = "ward.D2")
+        ctkn=cutree(hckn,h = cutt)
+      }
+      list(CT1k=ct1k,CTkn=CTkn)
+    }
+    names(tmp) = tf
+    retval[[x]] = tmp
+  }
+  return(retval)
+}
+
+summarization = function(tfmod,deltacl) {
+  # per ogni modulatore candidato x-esimo 
+  # selezione del miglior k per ogni coppia TF->target
+  # memorizzo solo le coppie TF-target con pval sig
+  retvalSum = list()
+  for (x in names(tfmod)) {
+    tmp = foreach(i=tfmod[[x]]$TF) %:%
+      foreach(j=tfmod[[x]]$TARGET, .combine='rbind') %dopar% {
+        b1k = which.min(tfmod[[x]]$PVAL1k[i,j,])
+        pv1k = tfmod[[x]]$PVAL1k[i,j,b1k]
+        retval=c()
+        if (!positiveOnly) {
+          bkn = which.min(tfmod[[x]]$PVALkn[i,j,])
+          pvkn = tfmod[[x]]$PVALkn[i,j,bkn]
+          if (pvkn <= sig) {
+            retval = rbind(c(FDR=pvkn,CL=deltacl[[x]]$CTkn,
+                             DELTA=tfmod[[x]]$DELTAkn[i,j,bkn],K=as.numeric(names(bkn)),DIRECTION= -1))
+            rownames(retval)=j
+          }
+        }
+        if (pv1k <=sig) {
+          retval = rbind(retval,c(FDR=pv1k,CL=deltacl[[x]]$CT1k,
+                                  DELTA=tfmod[[x]]$DELTA1k[i,j,b1k],K=as.numeric(names(b1k)),DIRECTION= +1))
+          rownames(retval)=rep(j,nrow(retval))
+        }
+        retval
+      }
+    retvalSum[[x]] = tmp
+  }
+  return(retvalSum)
+}
 
 
 svm.mod = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0.15,S=5,nboot=100,bfrac=0.8,sig=0.05, verbose=T,cl=NULL) {

@@ -39,6 +39,11 @@ tf = tf[tf %in% rownames(M)]
 
 target = setdiff(rownames(M),c(tf,modulators))
 
+
+# prova solo con 3 tf dell'oracolo
+tf = names(tfmodulators)[c(2,4)]
+modulators = c("BTK","LYN","ABL1","ARAF")
+
 # Prendo solo i target che hanno un motif di qualche TF sul promotore
 load("motifRanges.Rdata")
 motifRanges
@@ -58,10 +63,23 @@ library(foreach)
 library(doParallel)
 cl = makePSOCKcluster(10)
 registerDoParallel(cl)
-out = mmi(M,tf = tf,target = target,kordering = kordering,nboot=100,positiveOnly=F,S=200,sig = 0.01,cl=cl)
+out = mmi(M,tf = tf,target = target,kordering = kordering,nboot=100,positiveOnly=F,S=100,sig = 0.01,cl=cl)
 stopCluster(cl)
 
 # test prediction performance
+
+miotf="E2F1" #"ETS1"
+miomod=modulators[modulators %in% tfmodulators[[miotf]]]
+notmod=setdiff(modulators,miomod)
+
+w=out[[miomod[2]]][[miotf]]
+w=w[w[,"DIRECTION"]==-1,]
+w=w[order(w[,"DELTA"]*(1-w[,"FDR"]),decreasing=T),]
+w[1:10,]
+w=out[[notmod[2]]][[miotf]]
+w=w[w[,"DIRECTION"]==-1,]
+w=w[order(w[,"DELTA"]*(1-w[,"FDR"]),decreasing=T),]
+w[1:10,]
 
 # costruzione oracolo lista inversa TF -> modulator
 tfpred =list()
