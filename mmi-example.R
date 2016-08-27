@@ -64,7 +64,7 @@ library(foreach)
 library(doParallel)
 cl = makePSOCKcluster(10)
 registerDoParallel(cl)
-out = mmi(M,tf = tf,target = targets,kordering = kordering,nboot=100,positiveOnly=F,S=100,sig = 0.01,cl=cl)
+out = mmi(M,tf = tf,target = targets,kordering = kordering,nboot=1000,positiveOnly=F,S=100,sig = 0.01,cl=cl)
 stopCluster(cl)
 
 # test prediction performance
@@ -104,11 +104,16 @@ for(i in names(tfpred)) {
 
 load("out.Rdata")
 
-g="STAT3"
-m="EGFR"; m2 = "BTK"
+g="TP53"
+m="EGFR"; m2 = "BTK"; m3="ABL1"
 m %in% mod[[g]]
 m2 %in% mod[[g]]
-w=(out[[m]]$DELTA1k[g,,]>1 & out[[m]]$PVAL1k[g,,]<0.0001) | out[[m]]$DELTAkn[g,,]>1 & out[[m]]$PVALkn[g,,]<0.0001
+m3 %in% mod[[g]]
+m=m
+
+w=out[[m]]$DELTA1k[g,,]
+w[out[[m]]$PVAL1k[g,,]>0.01]=0
+
 w=w[rownames(w) != m,]
 rcol=rep("red",nrow(w))
 rcol[rownames(w) %in% trg[[g]]]="blue"

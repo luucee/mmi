@@ -76,6 +76,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     mi1k = array(0,dim=c(length(tf),length(target),length(range),nboot),dimnames=list(tf,target,range)) 
     if (!positiveOnly) mikn = mi1k 
     miall = mi1k
+    minull = mi1k
     ptm = proc.time()[3]
     tmp = foreach (bi = 1:nboot) %:%
       foreach(k = range) %dopar% {
@@ -92,12 +93,16 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
           #tmp.mikn[tmp.mikn<0] = 0
         }
         
-        # null
+        # all
         ksample = sample(1:ncol(kordering),k*bfrac)
         tmp.miall = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
         #tmp.miall[tmp.miall<0] = 0
+
+        # null
+        ksample = sample(1:ncol(kordering),k*bfrac)
+        tmp.minull = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,])
         
-        retval = list(MI1k=tmp.mi1k,MIkn=tmp.mikn,MIall=tmp.miall)
+        retval = list(MI1k=tmp.mi1k,MIkn=tmp.mikn,MIall=tmp.miall,MInull=tmp.minull)
         retval
       }
     
@@ -105,6 +110,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
       for (k in 1:length(range)) {
         mi1k[,,as.character(range[k]),bi] = tmp[[bi]][[k]]$MI1k
         miall[,,as.character(range[k]),bi] = tmp[[bi]][[k]]$MIall
+        minull[,,as.character(range[k]),bi] = tmp[[bi]][[k]]$MInull
         if(!positiveOnly) {
           mikn[,,as.character(range[k]),bi] = tmp[[bi]][[k]]$MIkn
         }
@@ -112,17 +118,21 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     }
     
 
-  
+    #azzero con la soglia
+    misoglia=apply(mikn,c(1,2,3),max)
+    
     # calcolo il cohen's d effect size tra i due bootstrap
     # per ogni TF-target-k
     #midelta1k = (apply(mi1k,c(1,2,3),mean)-apply(miall,c(1,2,3),mean))/sqrt((apply(mi1k,c(1,2,3),var)+apply(miall,c(1,2,3),var))/2)
-    midelta1k = log2(apply(mi1k,c(1,2,3),sum)/apply(miall,c(1,2,3),sum))
+    midelta1k = (abs(apply(mi1k,c(1,2,3),sum))/abs(apply(miall,c(1,2,3),sum)))
+    midelta1k[apply(mikn,c(1,2,3),sum)<misoglia] = 0
     mipval1k = midelta1k*0+1
     mipvalkn=NULL
     mideltakn=NULL
     if (!positiveOnly) {
       #mideltakn = (apply(mikn,c(1,2,3),mean)-apply(miall,c(1,2,3),mean))/sqrt((apply(mikn,c(1,2,3),var)+apply(miall,c(1,2,3),var))/2)
-      mideltakn=log2(apply(mikn,c(1,2,3),sum)/apply(miall,c(1,2,3),sum))
+      mideltakn=(abs(apply(mikn,c(1,2,3),sum))/abs(apply(miall,c(1,2,3),sum)))
+      mideltakn[apply(mikn,c(1,2,3),sum)<misoglia] = 0
       mipvalkn = mideltakn*0+1
     }
     
