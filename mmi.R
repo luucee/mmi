@@ -100,7 +100,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
 
         # null
         ksample = sample(1:ncol(kordering),k*bfrac)
-        tmp.minull = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,])
+        tmp.minull = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
         
         retval = list(MI1k=tmp.mi1k,MIkn=tmp.mikn,MIall=tmp.miall,MInull=tmp.minull)
         retval
