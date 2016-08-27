@@ -51,9 +51,13 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
 
   # ignoro il controllo di un range iniziale e finale con pochi sample
   # mi aspetto che il k risieda piu internamente
-  inizio = round(ncol(kordering)*ignore)
-  range= inizio:(ncol(kordering)-inizio)
-  range = range[seq(1,length(range),S)] # prendo ogni S sample per ridurre il numero di k da controllare
+  #inizio = round(ncol(kordering)*ignore)
+  #range= inizio:(ncol(kordering)-inizio)
+  #range = range[seq(1,length(range),S)] # prendo ogni S sample per ridurre il numero di k da controllare
+  sbin = ncol(kordering) %/% S
+  range = seq(1,ncol(kordering),sbin)
+  range = range[-1]
+  range = range[-length(range)]
   
   if(verbose) {
     print(paste0("Exp Matrix: ",paste0(dim(mexp),collapse="x")))
@@ -82,24 +86,24 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
       foreach(k = range) %dopar% {
         require(parmigene)
         retval = list()
-        ksample = sample(1:k,k*bfrac)
+        ksample = sample(1:k,sbin*bfrac)
         tmp.mi1k = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
         #tmp.mi1k[tmp.mi1k<0] = 0
         
         tmp.mikn=NULL
         if(!positiveOnly) {
-          ksample = sample((ncol(kordering)-k):ncol(kordering),k*bfrac)
+          ksample = sample((ncol(kordering)-k):ncol(kordering),sbin*bfrac)
           tmp.mikn = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
           #tmp.mikn[tmp.mikn<0] = 0
         }
         
         # all
-        ksample = sample(1:ncol(kordering),k*bfrac)
+        ksample = sample(1:ncol(kordering),sbin*bfrac)
         tmp.miall = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
         #tmp.miall[tmp.miall<0] = 0
 
         # null
-        ksample = sample(1:ncol(kordering),k*bfrac)
+        ksample = sample(1:ncol(kordering),sbin*bfrac)
         tmp.minull = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
         
         retval = list(MI1k=tmp.mi1k,MIkn=tmp.mikn,MIall=tmp.miall,MInull=tmp.minull)
