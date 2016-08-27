@@ -57,7 +57,9 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
   sbin = ncol(kordering) %/% S
   range = seq(1,ncol(kordering),sbin)
   range = range[-1]
-  range = range[-length(range)]
+  if ((sbin*S)<=ncol(kordering)) {
+    range = range[-length(range)]
+  }
   
   if(verbose) {
     print(paste0("Exp Matrix: ",paste0(dim(mexp),collapse="x")))
@@ -65,6 +67,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     print(paste0("N° modulators: ",nrow(kordering)))
     print(paste0("N° TF: ",length(tf)))
     print(paste0("Testing N° samples: ",length(range)))
+    print(paste0("Bin size: ",sbin))
     print(paste0("N° boots: ",nboot))
   }
   
