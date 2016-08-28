@@ -66,7 +66,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     print(paste0("N° targets: ",length(target)))
     print(paste0("N° modulators: ",nrow(kordering)))
     print(paste0("N° TF: ",length(tf)))
-    print(paste0("Testing N° samples: ",length(range)))
+    print(paste0("N° intervals: ",length(range)))
     print(paste0("Bin size: ",sbin))
     print(paste0("N° boots: ",nboot))
   }
@@ -182,7 +182,8 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
       ri = ri + 1
     }
     
-    tfmod[[x]] = list(TARGET=target,TF=tf,DELTA1k=midelta1k,PVAL1k=mipval1k,DELTAkn=mideltakn,PVALkn=mipvalkn)
+    tfmod[[x]] = list(TARGET=target,TF=tf,DELTA1k=midelta1k,PVAL1k=mipval1k,DELTAkn=mideltakn,PVALkn=mipvalkn,
+                      MIALL=media.all,MI1k=media.1k,MIkn=media.kn)
   }
   return(tfmod)
 }
@@ -221,11 +222,13 @@ summarization = function(mmiout,siglev=0.01) {
       for (j in colnames(b1k)) {
         pval = mmiout[[x]]$PVAL1k[i,j,b1k[i,j]]
         if(pval<siglev) {
-          retval = rbind(retval,data.frame(MOD=x,TF=i,TRG=j,FDR=pval,DELTA=mmiout[[x]]$DELTA1k[i,j,b1k[i,j]],DIRECTION= +1))
+          retval = rbind(retval,data.frame(MOD=x,TF=i,TRG=j,PVAL=pval,DELTA=mmiout[[x]]$DELTA1k[i,j,b1k[i,j]],MODdir= +1,
+                                           MI=mmiout[[x]]$MI1k[i,j,b1k[i,j]],MIall=mmiout[[x]]$MIall[i,j,b1k[i,j]]))
         }
         pval = mmiout[[x]]$PVALkn[i,j,bkn[i,j]]
         if(pval<siglev) {
-          retval = rbind(retval,data.frame(MOD=x,TF=i,TRG=j,FDR=pval,DELTA=mmiout[[x]]$DELTA1k[i,j,b1k[i,j]],DIRECTION= -1))
+          retval = rbind(retval,data.frame(MOD=x,TF=i,TRG=j,PVAL=pval,DELTA=mmiout[[x]]$DELTA1k[i,j,b1k[i,j]],MODdir= -1,
+                                           MI=mmiout[[x]]$MIkn[i,j,bkn[i,j]],MIall=mmiout[[x]]$MIall[i,j,bkn[i,j]]))
         }
       }
     }

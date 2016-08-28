@@ -104,7 +104,9 @@ for(i in names(tfpred)) {
 
 load("out.Rdata")
 
-s= summarization(out)
+s = summarization(out)
+s$FDR = p.adjust(s$PVAL,method="fdr")
+s = subset(s,FDR<0.01)
 s[order(-s$DELTA,s$FDR),][1:10,]
 
 g="TP53"
