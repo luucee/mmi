@@ -81,9 +81,13 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     # per ogni modulatore candidato x-esimo
     # matrice 4-dimensionale TF x target x range  x nboot
     mi1k = array(0,dim=c(length(tf),length(target),length(range),nboot),dimnames=list(tf,target,range)) 
-    if (!positiveOnly) mikn = mi1k 
+    if (!positiveOnly) {
+      mikn = mi1k 
+      mikn.null = mi1k
+    }
     miall = mi1k
-    minull = mi1k
+    mi1k.null = mi1k
+    
     ptm = proc.time()[3]
     tmp = foreach (k = range) %:%
       foreach(bi = 1:nboot) %dopar% {
@@ -91,12 +95,15 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
         retval = list()
         ksample = sample(1:k,sbin*bfrac)
         tmp.mi1k = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
+        tmp.mi1k.nl = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
         #tmp.mi1k[tmp.mi1k<0] = 0
         
         tmp.mikn=NULL
+        tmp.mikn.nl=NULL
         if(!positiveOnly) {
           ksample = sample((ncol(kordering)-k):ncol(kordering),sbin*bfrac)
           tmp.mikn = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
+          tmp.mikn.nl = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
           #tmp.mikn[tmp.mikn<0] = 0
         }
         
@@ -104,12 +111,8 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
         ksample = sample(1:ncol(kordering),sbin*bfrac)
         tmp.miall = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
         #tmp.miall[tmp.miall<0] = 0
-
-        # null
-        ksample = sample(1:ncol(kordering),sbin*bfrac)
-        tmp.minull = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
         
-        retval = list(MI1k=tmp.mi1k,MIkn=tmp.mikn,MIall=tmp.miall,MInull=tmp.minull)
+        retval = list(MI1k=tmp.mi1k,MIkn=tmp.mikn,MIall=tmp.miall,MI1knull=tmp.mi1k.nl,MIknnull=tmp.mikn.nl)
         retval
       }
     
@@ -117,16 +120,18 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
       for (k in 1:length(range)) {
         mi1k[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MI1k
         miall[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MIall
-        minull[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MInull
+        mi1k.null[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MI1knull
         if(!positiveOnly) {
           mikn[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MIkn
+          mikn.null[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MIknnull
         }
       }
     }
     
 
     #azzero con la soglia
-    misoglia=apply(minull,c(1,2,3),max)
+    misoglia.1k=apply(mi1k.null,c(1,2,3),max)
+    if(!positiveOnly) misoglia.kn=apply(mikn.null,c(1,2,3),max)
     
     # calcolo il cohen's d effect size tra i due bootstrap
     # per ogni TF-target-k
@@ -135,14 +140,14 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
     media.1k = apply(mi1k,c(1,2,3),median)
     media.kn = apply(mikn,c(1,2,3),median)
     midelta1k = media.1k/media.all
-    midelta1k[media.1k <= misoglia] = 0
+    midelta1k[media.1k <= misoglia.1k] = 0
     mipval1k = midelta1k*0+1
     mipvalkn=NULL
     mideltakn=NULL
     if (!positiveOnly) {
       #mideltakn = (apply(mikn,c(1,2,3),mean)-apply(miall,c(1,2,3),mean))/sqrt((apply(mikn,c(1,2,3),var)+apply(miall,c(1,2,3),var))/2)
       mideltakn = media.kn/media.all
-      mideltakn[media.kn <= misoglia] = 0
+      mideltakn[media.kn <= misoglia.kn] = 0
       mipvalkn = mideltakn*0+1
     }
     
