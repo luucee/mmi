@@ -104,23 +104,30 @@ for(i in names(tfpred)) {
 
 load("out.Rdata")
 
-g="MYC"
+s= summarization(out)
+s[order(-s$DELTA,s$FDR),][1:10,]
+
+g="TP53"
+# STAT3, MYC, TP53
 m="EGFR"; m2 = "BTK"; m3="ABL1"
 m %in% mod[[g]]
 m2 %in% mod[[g]]
 m3 %in% mod[[g]]
 
-mm=m
+mm=m2
 plot(M[mm,kordering[mm,]])
 
 w=out[[mm]]$DELTA1k[g,,]
-w[out[[mm]]$PVAL1k[g,,]>0.00000001]=0
-w[out[[mm]]$DELTA1k[g,,]<3]=0
+max(w)
+w[out[[mm]]$PVALkn[g,,]>0.00000001]=0
+w[out[[mm]]$DELTA1k[g,,]<2]=0
 w=w[rownames(w) != mm,]
+w = (out[[mm]]$DELTAkn[g,,]>2 & out[[mm]]$PVALkn[g,,]<0.01) | (out[[mm]]$DELTA1k[g,,]>2 & out[[mm]]$PVAL1k[g,,]<0.01)
 rcol=rep("red",nrow(w))
 rcol[rownames(w) %in% trg[[g]]]="blue"
 require(gplots)
-heatmap.2(w,dendrogram="row",Colv=F,RowSideColors=rcol,density.info="none",trace="none",scale="none")
+heatmap.2(w[rownames(w) %in% trg[[g]],]*1,dendrogram="row",Colv=F,#RowSideColors=rcol,
+          density.info="none",trace="none",scale="none")
 
 
 
