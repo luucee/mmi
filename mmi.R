@@ -131,7 +131,7 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
 
     #azzero con la soglia
     misoglia.1k=apply(mi1k.null,c(1,2,3),max)
-    if(!positiveOnly) misoglia.kn=apply(mikn.null,c(1,2,3),max)
+    if(!positiveOnly) misoglia.kn = apply(mikn.null,c(1,2,3),max)
     
     # calcolo il cohen's d effect size tra i due bootstrap
     # per ogni TF-target-k
@@ -193,27 +193,6 @@ mmi = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0
   return(tfmod)
 }
 
-delta.clustering = function(tfmod,cutt=0.4) {
-  # per ogni modulatore candidato x-esimo 
-  # e per ogni TF i-esimo effettuo il clustering dei target
-  # rispetto al log2 del rapporto
-  retval = list()
-  for (x in names(tfmod)) {
-    tmp = foreach(i=tfmod[[x]]$TF) %dopar% {
-      hc1k=hclust(tfmod[[x]]$DELTA1k[i,,]*(1-tfmod[[x]]$PVAL1k[i,,]),method = "ward.D2")
-      ct1k=cutree(hc1k,h = cutt)
-      ctkn=NULL
-      if(!is.null(tfmod[[x]]$DELTAkn)) {
-        hckn=hclust(tfmod[[x]]$DELTAkn[i,,]*(1-tfmod[[x]]$PVALkn[i,,]),method = "ward.D2")
-        ctkn=cutree(hckn,h = cutt)
-      }
-      list(CT1k=ct1k,CTkn=CTkn)
-    }
-    names(tmp) = tf
-    retval[[x]] = tmp
-  }
-  return(retval)
-}
 
 summarization = function(mmiout,siglev=0.01) {
   # per ogni modulatore candidato x-esimo 
