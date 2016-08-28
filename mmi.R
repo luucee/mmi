@@ -219,26 +219,30 @@ summarization = function(mmiout,siglev=0.01) {
   # per ogni modulatore candidato x-esimo 
   # selezione del miglior k per ogni coppia TF->target
   # memorizzo solo le coppie TF-target con pval sig
-  retval = c()
+  retval1 = c()
+  retval2 = c()
   for (x in names(mmiout)) {
+    cat(x,"\n")
     b1k = apply(mmiout[[x]]$DELTA1k,c(1,2),which.max)
     bkn = apply(mmiout[[x]]$DELTAkn,c(1,2),which.max)
     for (i in rownames(b1k)) {
       for (j in colnames(b1k)) {
         pval = mmiout[[x]]$PVAL1k[i,j,b1k[i,j]]
         if(pval<siglev) {
-          retval = rbind(retval,data.frame(MOD=x,TF=i,TRG=j,PVAL=pval,DELTA=mmiout[[x]]$DELTA1k[i,j,b1k[i,j]],MODdir= +1,
-                                           MI=mmiout[[x]]$MI1k[i,j,b1k[i,j]],MIall=mmiout[[x]]$MIall[i,j,b1k[i,j]]))
+          retval1 = rbind(retval1,c(PVAL=pval,DELTA=mmiout[[x]]$DELTA1k[i,j,b1k[i,j]],MODdir= +1,
+                                           MI=mmiout[[x]]$MI1k[i,j,b1k[i,j]],MIall=mmiout[[x]]$MIALL[i,j,b1k[i,j]]))
+          retval2 = rbind(retval2,c(MOD=x,TF=i,TRG=j))
         }
         pval = mmiout[[x]]$PVALkn[i,j,bkn[i,j]]
         if(pval<siglev) {
-          retval = rbind(retval,data.frame(MOD=x,TF=i,TRG=j,PVAL=pval,DELTA=mmiout[[x]]$DELTA1k[i,j,b1k[i,j]],MODdir= -1,
-                                           MI=mmiout[[x]]$MIkn[i,j,bkn[i,j]],MIall=mmiout[[x]]$MIall[i,j,bkn[i,j]]))
+          retval1 = rbind(retval1,c(PVAL=pval,DELTA=mmiout[[x]]$DELTAkn[i,j,bkn[i,j]],MODdir= -1,
+                                           MI=mmiout[[x]]$MIkn[i,j,bkn[i,j]],MIall=mmiout[[x]]$MIALL[i,j,bkn[i,j]]))
+          retval2 = rbind(retval2,c(MOD=x,TF=i,TRG=j))
         }
       }
     }
   }
-  return(retval)
+  return(data.frame(retval1,retval2,stringsAsFactors = F))
 }
 
 
