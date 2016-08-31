@@ -97,10 +97,10 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
     mikn = mi1k 
     for (k in range) {
       ksample = 1:k
-      mi1k[,,as.character(range[k]),bi] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
+      mi1k[,,as.character(range[k])] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
       if(!positiveOnly) {
         ksample = (ncol(kordering)-k):ncol(kordering)
-        mikn[,,as.character(range[k]),bi] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
+        mikn[,,as.character(range[k])] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
       }
     }
     

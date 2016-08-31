@@ -2,7 +2,7 @@
 
 setwd("/storage/ocfs2_vol1/PUBLIC/FusionProject")
 
-source("mmi.R")
+source("mmi2.R")
 load("geDataGBM.RData",verbose=T)
 load("gseaResGBM160629.RData",verbose=T)
 
@@ -55,6 +55,7 @@ require(xlsx)
 file.remove("mod-out.xls")
 for(t in tf) {
   s = subset(stab,DELTA>4 & TF==t & FDR<0.00001)
+  s = s[order(-s$DELTA,s$FDR),]
   write.xlsx(s,file="mod-out.xls",row.names = F,sheetName = t ,append = T)
 }
 
