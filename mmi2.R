@@ -119,7 +119,7 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
         
         ksample = (ncol(kordering)-k):ncol(kordering)
         tmp.mikn.perm = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
-        list(BootAll = tmp.all,Perm1k = tmp.mi1k.perm,Permkn=tmp.mikn.perm)
+        list(BootAll = tmp.miall,Perm1k = tmp.mi1k.perm,Permkn=tmp.mikn.perm)
         
       }
     for (bi in 1:nboot) {
