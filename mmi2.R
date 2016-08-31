@@ -135,6 +135,11 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
 
     mipval1k = apply(midelta1k[1:length(midelta1k)] > (mi1k.perm/miall[1:length(miall)]),c(1,2,3),sum)/nboot
     mipvalkn = apply(mideltakn[1:length(mideltakn)] > (mikn.perm/miall[1:length(miall)]),c(1,2,3),sum)/nboot
+
+    deltamindy = mi1k[,,range[1]] - mikn[,,range[length(range)]]
+    deltamindy.perm = mi1k.perm[,,range[1],]-mikn.perm[,,range[length(range)],]
+
+    pvalmindy = apply(deltamindy[1:length(deltamindy)] > deltamindy.perm,c(1,2),sum)/nboot
     
     if(verbose) {
       print(paste0(x," took ",proc.time()[3]-ptm," sec. "))
@@ -144,10 +149,11 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
     }
     
     tfmod[[x]] = list(TARGET=target,TF=tf,DELTA1k=midelta1k,PVAL1k=mipval1k,DELTAkn=mideltakn,PVALkn=mipvalkn,
-                      MIALL=miall,MI1k=mi1k,MIkn=mikn)
+                      MIALL=miall,MI1k=mi1k,MIkn=mikn,DELTAmindy=deltamindy,PVALmindy=pvalmindy)
   }
   return(tfmod)
 }
+
 
 
 summarization = function(mmiout,siglev=0.01) {
