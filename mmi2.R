@@ -73,13 +73,12 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
   
   # rimozione mod-tf dipendenti
   mi.mod = knnmi.cross(mexp[rownames(kordering),],mexp[tflist,])
-  soglie = rep(0,nrow(kordering))
+  count = mi.mod*0
   for (bi in 1:nboot) {
     mi = knnmi.cross(mexp[rownames(kordering),],mexp[tflist,sample(1:ncol(mexp))])
-    mi.max = apply(mi,1,max)
-    soglie[soglie<mi.max] = mi.max[soglie<mi.max]
+    count = count + mi>mi.mod
   }
-  mi.mod[mi.mod <= soglie]=0
+  mi.mod[count/nboot <= 0.01]=0
   
   # struttura dati ritornata
   # lista dei geni modulatori (cofattori o target). Per ogni modulatore una matrice 
