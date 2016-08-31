@@ -136,8 +136,8 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
     mipval1k = apply(midelta1k[1:length(midelta1k)] > (mi1k.perm/miall[1:length(miall)]),c(1,2,3),sum)/nboot
     mipvalkn = apply(mideltakn[1:length(mideltakn)] > (mikn.perm/miall[1:length(miall)]),c(1,2,3),sum)/nboot
 
-    deltamindy = mi1k[,,range[1]] - mikn[,,range[length(range)]]
-    deltamindy.perm = mi1k.perm[,,range[1],]-mikn.perm[,,range[length(range)],]
+    deltamindy = mi1k[,,as.character(range[1])] - mikn[,,as.character(range[length(range)])]
+    deltamindy.perm = mi1k.perm[,,as.character(range[1]),]-mikn.perm[,,as.character(range[length(range)]),]
 
     pvalmindy = apply(deltamindy[1:length(deltamindy)] > deltamindy.perm,c(1,2),sum)/nboot
     
