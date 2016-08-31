@@ -41,9 +41,9 @@ load("out-GBM.Rdata")
 
 # tab output
 # PVAL - pvalue del test wilcox tra le MI calcolate nei sample 1..k e all
+# MI - mutua informazione dove avviene la regolazione
+# MIall - mutua informazione in tutti i sample
 # MODdir - direzione della modulazione (+1 la regolazione avviene in High, -1 la regolazione avviene in Low)
-# MI - media della mutua informazione dove avviene la regolazione
-# MIall - media della mutua informazione in tutti i sample
 # DELTA - rapporto tra MI/Miall
 # MOD - gene modulatore
 # TF - gene transcription factor
@@ -51,17 +51,10 @@ load("out-GBM.Rdata")
 stab = summarization(out)
 stab$FDR = p.adjust(stab$PVAL,method="fdr")
 
-# in Paglioma i good sono presenti in 3 liste
-s = subset(stab,DELTA>4 & MODdir == -1 & TF=="PPARGC1A" & FDR<0.00001)
-good %in% s$MOD # PanGlioma  e GBM
-s[order(-s$DELTA,s$FDR),]
-s = subset(stab,DELTA>4 & MODdir == 1 & TF=="PPARGC1A" & FDR<0.00001)
-good %in% s$MOD
-s[order(-s$DELTA,s$FDR),]
-s = subset(stab,DELTA>4 & MODdir == -1 & TF=="ESRRG" & FDR<0.00001)
-good %in% s$MOD # PanGlioma e GBM
-s[order(-s$DELTA,s$FDR),]
-s = subset(stab,DELTA>4 & MODdir == 1 & TF=="ESRRG" & FDR<0.00001)
-good %in% s$MOD # PanGlioma
-s[order(-s$DELTA,s$FDR),]
+require(xlsx)
+file.remove("mod-out.xls")
+for(t in tf) {
+  s = subset(stab,DELTA>4 & TF==t & FDR<0.00001)
+  write.xlsx(s,file="mod-out.xls",row.names = F,sheetName = t ,append = T)
+}
 

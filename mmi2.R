@@ -88,109 +88,54 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
   if(!verbose) pb = txtProgressBar(min=1,max=nrow(kordering),style=3) 
   ri = 1 # contatore per la progress bar
   for (x in rownames(kordering)) {
+    ptm = proc.time()[3]
+    
     # considero solo i tf non dipendenti da x
     tf = names(mi.mod[x,tflist]>0)
     # per ogni modulatore candidato x-esimo
     # matrice 4-dimensionale TF x target x range  x nboot
-    mi1k = array(0,dim=c(length(tf),length(target),length(range),nboot),dimnames=list(tf,target,range)) 
-    if (!positiveOnly) {
-      mikn = mi1k 
-      mikn.null = mi1k
+    mi1k = array(0,dim=c(length(tf),length(target),length(range)),dimnames=list(tf,target,range)) 
+    mikn = mi1k 
+    for (k in range) {
+      ksample = 1:k
+      mi1k[,,as.character(range[k]),bi] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
+      if(!positiveOnly) {
+        ksample = (ncol(kordering)-k):ncol(kordering)
+        mikn[,,as.character(range[k]),bi] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
+      }
     }
-    miall = mi1k
-    mi1k.null = mi1k
     
-    ptm = proc.time()[3]
+    miall.boot = array(0,dim=c(length(tf),length(target),length(range),nboot),dimnames=list(tf,target,range)) 
+    mi1k.perm = miall.boot
+    mikn.perm = miall.boot
     tmp = foreach (k = range) %:%
       foreach(bi = 1:nboot) %dopar% {
         require(parmigene)
-        retval = list()
-        ksample = sample(1:k,sbin*bfrac)
-        tmp.mi1k = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-        tmp.mi1k.nl = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
-        #tmp.mi1k[tmp.mi1k<0] = 0
-        
-        tmp.mikn=NULL
-        tmp.mikn.nl=NULL
-        if(!positiveOnly) {
-          ksample = sample((ncol(kordering)-k):ncol(kordering),sbin*bfrac)
-          tmp.mikn = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-          tmp.mikn.nl = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
-          #tmp.mikn[tmp.mikn<0] = 0
-        }
-        
         # all
-        ksample = sample(1:ncol(kordering),sbin*bfrac)
+        ksample = sample(1:ncol(kordering),sbin)
         tmp.miall = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-        #tmp.miall[tmp.miall<0] = 0
+
+        ksample = 1:k
+        tmp.mi1k.perm = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
         
-        retval = list(MI1k=tmp.mi1k,MIkn=tmp.mikn,MIall=tmp.miall,MI1knull=tmp.mi1k.nl,MIknnull=tmp.mikn.nl)
-        retval
+        ksample = (ncol(kordering)-k):ncol(kordering)
+        tmp.mikn.perm = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
+        list(BootAll = tmp.all,Perm1k = tmp.mi1k.perm,Permkn=tmp.mikn.perm)
+        
       }
-    
     for (bi in 1:nboot) {
       for (k in 1:length(range)) {
-        mi1k[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MI1k
-        miall[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MIall
-        mi1k.null[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MI1knull
-        if(!positiveOnly) {
-          mikn[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MIkn
-          mikn.null[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$MIknnull
-        }
+        miall.boot[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$BootAll
+        mi1k.perm[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$Perm1k
+        mikn.perm[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$Permkn
       }
     }
-    
+    miall = apply(miall.boot,c(1,2,3),median)
+    midelta1k = mi1k/miall    
+    mideltakn = mikn/miall
 
-    #azzero con la soglia
-    misoglia.1k=apply(mi1k.null,c(1,2,3),max)
-    if(!positiveOnly) misoglia.kn = apply(mikn.null,c(1,2,3),max)
-    
-    # calcolo il cohen's d effect size tra i due bootstrap
-    # per ogni TF-target-k
-    #midelta1k = (apply(mi1k,c(1,2,3),mean)-apply(miall,c(1,2,3),mean))/sqrt((apply(mi1k,c(1,2,3),var)+apply(miall,c(1,2,3),var))/2)
-    media.all = apply(miall,c(1,2,3),median)
-    media.1k = apply(mi1k,c(1,2,3),median)
-    media.kn = apply(mikn,c(1,2,3),median)
-    midelta1k = media.1k/media.all
-    midelta1k[media.1k <= misoglia.1k] = 0
-    mipval1k = midelta1k*0+1
-    mipvalkn=NULL
-    mideltakn=NULL
-    if (!positiveOnly) {
-      #mideltakn = (apply(mikn,c(1,2,3),mean)-apply(miall,c(1,2,3),mean))/sqrt((apply(mikn,c(1,2,3),var)+apply(miall,c(1,2,3),var))/2)
-      mideltakn = media.kn/media.all
-      mideltakn[media.kn <= misoglia.kn] = 0
-      mipvalkn = mideltakn*0+1
-    }
-    
-    # effettuo il test tra i due sample boot
-    # per ogni TF-target al sample k-esimo sia direct (positiveOnly==T) che inverse
-    for(i in tf) {
-      mipval1k[i,,] = foreach(t=target, .combine='rbind') %:% 
-        foreach(j=as.character(range), .combine='c') %dopar% {
-          if (i==t) {
-            1
-          } else {
-            #t.test(mi1k[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
-            wilcox.test(mi1k[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
-          }
-        }
-      if (!positiveOnly) {
-        mipvalkn[i,,] = foreach(t=target, .combine='rbind') %:% 
-          foreach(j=as.character(range), .combine='c') %dopar% {
-            if (i==t) {
-              1
-            } else {
-              #t.test(mikn[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
-              wilcox.test(mikn[i,t,j,],miall[i,t,j,],alternative="greater")$p.value
-            }
-          }
-      }
-    }
-
-    # correzione dei pvalue
-    #mipval1k[1:length(mipval1k)] = p.adjust(mipval1k[1:length(mipval1k)],method="fdr")
-    #if (!positiveOnly) mipvalkn[1:length(mipvalkn)] = p.adjust(mipvalkn[1:length(mipvalkn)],method="fdr")
+    mipval1k = apply(midelta1k > (mi1k.perm/miall.boot),c(1,2,3),sum)/nboot
+    mipvalkn = apply(mideltakn > (mikn.perm/miall.boot),c(1,2,3),sum)/nboot
     
     if(verbose) {
       print(paste0(x," took ",proc.time()[3]-ptm," sec. "))
@@ -200,7 +145,7 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
     }
     
     tfmod[[x]] = list(TARGET=target,TF=tf,DELTA1k=midelta1k,PVAL1k=mipval1k,DELTAkn=mideltakn,PVALkn=mipvalkn,
-                      MIALL=media.all,MI1k=media.1k,MIkn=media.kn)
+                      MIALL=miall,MI1k=mi1k,MIkn=mikn)
   }
   return(tfmod)
 }
