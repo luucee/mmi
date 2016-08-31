@@ -133,8 +133,8 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
     midelta1k = mi1k/miall    
     mideltakn = mikn/miall
 
-    mipval1k = apply(midelta1k > (mi1k.perm/miall.boot),c(1,2,3),sum)/nboot
-    mipvalkn = apply(mideltakn > (mikn.perm/miall.boot),c(1,2,3),sum)/nboot
+    mipval1k = apply(midelta1k[1:length(midelta1k)] > (mi1k.perm/miall[1:length(miall)]),c(1,2,3),sum)/nboot
+    mipvalkn = apply(mideltakn[1:length(mideltakn)] > (mikn.perm/miall[1:length(miall)]),c(1,2,3),sum)/nboot
     
     if(verbose) {
       print(paste0(x," took ",proc.time()[3]-ptm," sec. "))
