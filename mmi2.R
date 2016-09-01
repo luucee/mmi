@@ -78,7 +78,9 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
     mi = knnmi.cross(mexp[rownames(kordering),],mexp[tflist,sample(1:ncol(mexp))])
     count = count + mi>mi.mod
   }
-  mi.mod[count/nboot <= 0.01]=0
+  pval.mod = count/nboot
+  pval.mod[1:length(pval.mod)]=p.adjust(pval.mod[1:length(pval.mod)],method = "fdr")
+  mi.mod[pval.mod <= 0.01]=0
   
   # struttura dati ritornata
   # lista dei geni modulatori (cofattori o target). Per ogni modulatore una matrice 
