@@ -1,4 +1,4 @@
-source("mmi.R")
+source("mmi2.R")
 
 # Dataset lavoro Gambardella et al. BMC Bioinformatics (2015) 16:279
 #require(R.matlab)
@@ -101,13 +101,13 @@ for(i in names(tfpred)) {
   perf = performance(pred,measure="prec",x.measure="rec")
   plot(perf)
 }
-
-load("out.Rdata")
+source("mmi.R")
+load("outl.Rdata")
 
 s = summarization(out)
 s$FDR = p.adjust(s$PVAL,method="fdr")
 s = subset(s,FDR<0.01)
-s[order(-s$DELTA,s$FDR),][1:10,]
+s[order(-s$DELTA,s$FDR),][1:30,]
 
 g="TP53"
 # STAT3, MYC, TP53
@@ -132,7 +132,8 @@ heatmap.2(w[rownames(w) %in% trg[[g]],]*1,dendrogram="row",Colv=F,#RowSideColors
           density.info="none",trace="none",scale="none")
 
 
-
+h=c("RPL22","TP53","BTK")
+heatmap(M[rownames(M) %in% h,])
 
 
 
