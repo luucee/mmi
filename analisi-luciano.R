@@ -31,6 +31,9 @@ require(doParallel)
 cl = makePSOCKcluster(10)
 registerDoParallel(cl)
 #out = mmi(geData,tf = tf,target = targets,kordering = kordering,nboot=1000,positiveOnly=F,S=3,cl=cl)
+
+otab = mindy.perm(geData,tflist = tf,target = targets,kordering = kordering,nboot=100,S=3,cl=cl)
+
 out = mindy(geData,tf = tf,target = targets,kordering = kordering,nboot=1000,S=3,cl=cl)
 stopCluster(cl)
 save(out,file="out-GBM.Rdata")
