@@ -29,9 +29,11 @@ mindy.perm = function(mexp,tflist,target,kordering,S=3,nboot=1000,verbose=T,cl=N
   stab=mindy.sum(out)
   stab$PVAL = p.adjust(stab$PVAL ,method = "fdr")
   s = subset(stab,PVAL<0.01)
+  print(nrow(s))
   ntrg = aggregate(s$TRG,by=list(s$MOD,s$TF),length)
   ntrg[,4] = 0
-  head(ntrg[order(-ntrg[,3]),],20)
+  rownames(ntrg) = paste(ntrg[,1],ntrg[,2])
+  print(head(ntrg[order(-ntrg[,3]),],20))
   for (i in 1:nboot) {
     cat(i,"\n")
     ptm = proc.time()[3]
@@ -41,9 +43,9 @@ mindy.perm = function(mexp,tflist,target,kordering,S=3,nboot=1000,verbose=T,cl=N
     stab.perm$PVAL = p.adjust(stab.perm$PVAL ,method = "fdr")
     s = subset(stab.perm,PVAL<0.05)
     ntrg.perm = aggregate(s$TRG,by=list(s$MOD,s$TF),length)
-    for(j in 1:nrow(ntrg)) {
-      ntrg[j,4] = ntrg[j,4] + (ntrg[j,3] < ntrg.perm[ntrg.perm[,1]==ntrg[j,1] & ntrg.perm[,2]==ntrg[j,2],3])
-    }
+    rownames(ntrg.perm) = paste(ntrg.perm[,1],ntrg.perm[,2])
+    ntrg.perm = ntrg.perm[rownames(ntrg.perm) %in% rownames(ntrg),]
+    ntrg[rownames(ntrg.perm),4] = ntrg[rownames(ntrg.perm),4] + (ntrg[rownames(ntrg.perm),3] < ntrg.perm[,3])
     print(paste0(i," PERMUTATION took ",proc.time()[3]-ptm," sec. "))
   }
   ntrg[,4] = ntrg[,4]/nboot
