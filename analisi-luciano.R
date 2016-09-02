@@ -49,21 +49,21 @@ load("out-GBM.Rdata")
 # TF - gene transcription factor
 # TRG - target del TF modulato da MOD
 stab = summarization(out)
-stab$PVALkn = 1-stab$PVALkn
-stab$PVAL1k = 1-stab$PVAL1k
-stab$PVALmindy = 1-stab$PVALmindy
 
 stab$PVALmindy = p.adjust(stab$PVALmindy ,method = "fdr")
 stab$PVALkn = p.adjust(stab$PVALkn ,method = "fdr")
 stab$PVAL1k = p.adjust(stab$PVAL1k ,method = "fdr")
 
 s = subset(stab,PVALmindy<0.01)
+good %in% s$MOD
 nrow(s)
 s[order(-abs(s$DELTAmindy),s$PVALmindy),][1:10,]
+good %in% s$MOD
 s = subset(stab,PVALkn<0.01)
 nrow(s)
 s[order(-abs(s$DELTAkn),s$PVALkn),][1:10,]
 s = subset(stab,PVAL1k<0.01)
+good %in% s$MOD
 nrow(s)
 s[order(-abs(s$DELTA1k),s$PVAL1k),][1:10,]
 

@@ -135,11 +135,11 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
     midelta1k = mi1k - miall    
     mideltakn = mikn - miall
 
-    mipval1k = apply(midelta1k[1:length(midelta1k)] < (mi1k.perm/miall[1:length(miall)]),c(1,2,3),sum)/nboot
-    mipvalkn = apply(mideltakn[1:length(mideltakn)] < (mikn.perm/miall[1:length(miall)]),c(1,2,3),sum)/nboot
+    mipval1k = apply(midelta1k[1:length(midelta1k)] < (mi1k.perm - miall[1:length(miall)]),c(1,2,3),sum)/nboot
+    mipvalkn = apply(mideltakn[1:length(mideltakn)] < (mikn.perm - miall[1:length(miall)]),c(1,2,3),sum)/nboot
 
     deltamindy = mi1k[,,as.character(range[1])] - mikn[,,as.character(range[length(range)])]
-    deltamindy.perm = mi1k.perm[,,as.character(range[1]),]-mikn.perm[,,as.character(range[length(range)]),]
+    deltamindy.perm = mi1k.perm[,,as.character(range[1]),] - mikn.perm[,,as.character(range[length(range)]),]
 
     pvalmindy = apply(deltamindy[1:length(deltamindy)] < deltamindy.perm,c(1,2),sum)/nboot
     
@@ -172,8 +172,8 @@ summarization = function(mmiout) {
       for (j in colnames(b1k)) {
         pval1k = mmiout[[x]]$PVAL1k[i,j,b1k[i,j]]
         pvalkn = mmiout[[x]]$PVALkn[i,j,bkn[i,j]]
-        retval1 = rbind(retval1,c(PVALkn=pvalkn,DELTAkn=mmiout[[x]]$DELTAkn[i,j,bkn[i,j]],
-                                  PVAL1k=pval1k,DELTA1k=mmiout[[x]]$DELTA1k[i,j,b1k[i,j]],
+        retval1 = rbind(retval1,c(PVALkn=pvalkn,DELTAkn=mmiout[[x]]$DELTAkn[i,j,bkn[i,j]],Kkn=bkn[i,j],
+                                  PVAL1k=pval1k,DELTA1k=mmiout[[x]]$DELTA1k[i,j,b1k[i,j]],K1k=b1k[i,j],
                                   PVALmindy = mmiout[[x]]$PVALmindy[i,j],DELTAmindy = mmiout[[x]]$DELTAmindy[i,j]))
         retval2 = rbind(retval2,c(MOD=x,TF=i,TRG=j))
       }
