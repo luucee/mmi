@@ -93,8 +93,9 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
     
     # considero solo i tf non dipendenti da x
     tf = names(mi.mod[x,tflist]>0)
+    
     # per ogni modulatore candidato x-esimo
-    # matrice 4-dimensionale TF x target x range  x nboot
+    # matrice 3-dimensionale delle MI TF x target x range
     mi1k = array(0,dim=c(length(tf),length(target),length(range)),dimnames=list(tf,target,range)) 
     mikn = mi1k 
     for (k in range) {
@@ -113,7 +114,7 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
       foreach(bi = 1:nboot) %dopar% {
         require(parmigene)
         # all
-        ksample = sample(1:ncol(kordering),sbin)
+        ksample = sample(1:ncol(kordering),k)
         tmp.miall = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
 
         ksample = 1:k
