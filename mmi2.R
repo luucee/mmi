@@ -82,10 +82,8 @@ mindy = function(mexp,tflist,target,kordering,S=5,nboot=100,verbose=T,cl=NULL) {
     for (k in range) {
       ksample = 1:k
       mi1k[,,as.character(k)] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-      if(!positiveOnly) {
-        ksample = (ncol(kordering)-k):ncol(kordering)
-        mikn[,,as.character(k)] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-      }
+      ksample = (ncol(kordering)-k):ncol(kordering)
+      mikn[,,as.character(k)] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
     }
     
     mi1k.perm = array(0,dim=c(length(tf),length(target),length(range),nboot),dimnames=list(tf,target,range)) 
