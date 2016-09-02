@@ -30,7 +30,8 @@ require(foreach)
 require(doParallel)
 cl = makePSOCKcluster(10)
 registerDoParallel(cl)
-out = mmi(geData,tf = tf,target = targets,kordering = kordering,nboot=1000,positiveOnly=F,S=3,cl=cl)
+#out = mmi(geData,tf = tf,target = targets,kordering = kordering,nboot=1000,positiveOnly=F,S=3,cl=cl)
+out = mindy(geData,tf = tf,target = targets,kordering = kordering,nboot=1000,S=3,cl=cl)
 stopCluster(cl)
 save(out,file="out-GBM.Rdata")
 #save(out,file="out-Panglioma.Rdata")
@@ -48,25 +49,27 @@ load("out-GBM.Rdata")
 # MOD - gene modulatore
 # TF - gene transcription factor
 # TRG - target del TF modulato da MOD
-stab = summarization(out)
+stab = mindy.sum(out)
 
-stab$PVALmindy = p.adjust(stab$PVALmindy ,method = "fdr")
+stab$PVAL = p.adjust(stab$PVAL ,method = "fdr")
 stab$PVALkn = p.adjust(stab$PVALkn ,method = "fdr")
 stab$PVAL1k = p.adjust(stab$PVAL1k ,method = "fdr")
 
-s = subset(stab,PVALmindy<0.01)
+s = subset(stab,PVAL<0.01)
 good %in% s$MOD
 nrow(s)
 s=s[order(-abs(s$DELTAmindy),s$PVALmindy),]
 cumsum(s$MOD %in% good)
+
 s = subset(stab,PVALkn<0.01)
-good %in% s$MOD
+s=s[order(-s$DELTAkn,s$PVALkn),]
 nrow(s)
-s[order(-abs(s$DELTAkn),s$PVALkn),][1:10,]
+cumsum(s$MOD %in% good)
+
 s = subset(stab,PVAL1k<0.01)
-good %in% s$MOD
+s=s[order(-s$DELTA1k,s$PVAL1k),]
 nrow(s)
-s[order(-abs(s$DELTA1k),s$PVAL1k),][1:10,]
+cumsum(s$MOD %in% good)
 
 require(xlsx)
 file.remove("mod-out.xls")

@@ -9,6 +9,138 @@ cohens_d <- function(x, y) {
   return(cd)
 }
 
+
+mindy.perm = function(mexp,tflist,target,kordering,S=3,nboot=1000,verbose=T,cl=NULL) {
+  out = mindy(mexp,tflist,target,kordering,S,verbose=F,cl=cl)
+  stab=mindy.sum(out)
+  stab$PVAL = p.adjust(stab$PVAL ,method = "fdr")
+  s = subset(stab,PVAL<0.05)
+  ntrg = aggregate(s$TRG,by=list(s$MOD,s$TF),length)
+  
+  for (i in 1:nboot) {
+    out.perm = mindy(mexp,tflist,target,apply(kordering,1,sample),S,verbose=F,cl=cl)
+    stab.perm = mindy.sum(out.perm)
+    stab.perm$PVAL = p.adjust(stab.perm$PVAL ,method = "fdr")
+    s = subset(stab.perm,PVAL<0.05)
+    ntrg.perm = aggregate(s$TRG,by=list(s$MOD,s$TF),length)
+  }
+}
+
+mindy = function(mexp,tflist,target,kordering,S=5,nboot=100,verbose=T,cl=NULL) {
+
+  require(parmigene)
+  
+  sbin = ncol(kordering) %/% S
+  range = seq(0,ncol(kordering),sbin)
+  range = range[-1]
+  if ((sbin*S)<=ncol(kordering)) {
+    range = range[-length(range)]
+  }
+  if (length(range) %% 2 == 0) {
+    range = range[1:length(range)/2]
+  } else {
+    range = range[1:(length(range)+1)/2]
+  }
+  
+  if(verbose) {
+    print(paste0("Exp Matrix: ",paste0(dim(mexp),collapse="x")))
+    print(paste0("N° targets: ",length(target)))
+    print(paste0("N° modulators: ",nrow(kordering)))
+    print(paste0("N° TF: ",length(tflist)))
+    print(paste0("N° intervals: ",length(range)))
+    print(paste0("Bin size: ",sbin))
+    print(paste0("N° boots: ",nboot))
+  }
+  
+  # rimozione mod-tf dipendenti
+  mi.mod = knnmi.cross(mexp[rownames(kordering),],mexp[tflist,])
+  count = mi.mod*0
+  for (bi in 1:nboot) {
+    mi = knnmi.cross(mexp[rownames(kordering),],mexp[tflist,sample(1:ncol(mexp))])
+    count = count + mi>mi.mod
+  }
+  pval.mod = count/nboot
+  pval.mod[1:length(pval.mod)]=p.adjust(pval.mod[1:length(pval.mod)],method = "fdr")
+  mi.mod[pval.mod > 0.01]=0
+  
+  # struttura dati ritornata
+  # lista dei geni modulatori (cofattori o target). Per ogni modulatore una matrice 
+  tfmod = list()
+  
+  if(!verbose) pb = txtProgressBar(min=1,max=nrow(kordering),style=3) 
+  ri = 1 # contatore per la progress bar
+  for (x in rownames(kordering)) {
+    ptm = proc.time()[3]
+    
+    # considero solo i tf non dipendenti da x
+    tf = names(mi.mod[x,tflist]==0)
+    
+    # per ogni modulatore candidato x-esimo
+    # matrice 3-dimensionale delle MI TF x target x range
+    mi1k = array(0,dim=c(length(tf),length(target),length(range)),dimnames=list(tf,target,range)) 
+    mikn = mi1k 
+    for (k in range) {
+      ksample = 1:k
+      mi1k[,,as.character(k)] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
+      if(!positiveOnly) {
+        ksample = (ncol(kordering)-k):ncol(kordering)
+        mikn[,,as.character(k)] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
+      }
+    }
+    
+    mi1k.perm = array(0,dim=c(length(tf),length(target),length(range),nboot),dimnames=list(tf,target,range)) 
+    mikn.perm = mi1k.perm
+    tmp = foreach (k = range) %:%
+      foreach(bi = 1:nboot) %dopar% {
+        require(parmigene)
+        ksample = 1:k
+        tmp.mi1k.perm = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
+        
+        ksample = (ncol(kordering)-k):ncol(kordering)
+        tmp.mikn.perm = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
+        list(Perm1k = tmp.mi1k.perm,Permkn=tmp.mikn.perm)
+        
+      }
+    for (bi in 1:nboot) {
+      for (k in 1:length(range)) {
+        mi1k.perm[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$Perm1k
+        mikn.perm[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$Permkn
+      }
+    }
+    deltamindy = mi1k[,,as.character(range[1])] - mikn[,,as.character(range[1])]
+    deltamindy.perm = mi1k.perm[,,as.character(range[1]),] - mikn.perm[,,as.character(range[1]),]
+    
+    pvalmindy = apply(deltamindy[1:length(deltamindy)] < deltamindy.perm,c(1,2),sum)/nboot
+    
+    if(verbose) {
+      print(paste0(x," took ",proc.time()[3]-ptm," sec. "))
+    } else {
+      setTxtProgressBar(pb, ri)
+      ri = ri + 1
+    }
+    
+    tfmod[[x]] = list(DELTA=deltamindy,PVAL=pvalmindy)
+  }
+  return(tfmod)
+}
+
+
+mindy.sum = function(mmiout,sig=0.05) {
+  # per ogni modulatore candidato x-esimo 
+  # selezione del miglior k per ogni coppia TF->target
+  # memorizzo solo le coppie TF-target con pval sig
+  retval = NULL
+  for (x in names(mmiout)) {
+    delta = mmiout[[x]]$DELTAmindy
+    pval = mmiout[[x]]$PVALmindy
+    trgnames = rep(colnames(delta),times=rep(nrow(delta),ncol(delta)))
+    tfnames = rep(rownames(delta),ncol(delta))
+    retval = rbind(retval,data.frame(MOD=x,TF=tfnames,TRG=trgnames,DELTA=delta[1:length(delta)],PVAL=pval[1:length(pval)]))
+  }
+  return(retval)
+}
+
+
 mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0.15,S=5,nboot=100,bfrac=0.8,sig=0.05, verbose=T,cl=NULL) {
   # mexp - matrice di espressione (geni sulle righe, samples sulle colonne)
   # tf - lista dei TF (deve essere un sottoinsieme di rownames(mexp))
@@ -167,14 +299,15 @@ summarization = function(mmiout) {
   retval2 = c()
   for (x in names(mmiout)) {
     cat(x,"\n")
-    b1k = apply(mmiout[[x]]$PVAL1k,c(1,2),which.min)
-    bkn = apply(mmiout[[x]]$PVALkn,c(1,2),which.min)
+    #b1k = apply(mmiout[[x]]$PVAL1k,c(1,2),which.min)
+    #bkn = apply(mmiout[[x]]$PVALkn,c(1,2),which.min)
+    b1k=mmiout[[x]]$DELTAkn
     for (i in rownames(b1k)) {
       for (j in colnames(b1k)) {
-        pval1k = mmiout[[x]]$PVAL1k[i,j,b1k[i,j]]
-        pvalkn = mmiout[[x]]$PVALkn[i,j,bkn[i,j]]
-        retval1 = rbind(retval1,c(PVALkn=pvalkn,DELTAkn=mmiout[[x]]$DELTAkn[i,j,bkn[i,j]],Kkn=bkn[i,j],
-                                  PVAL1k=pval1k,DELTA1k=mmiout[[x]]$DELTA1k[i,j,b1k[i,j]],K1k=b1k[i,j],
+        pval1k = mmiout[[x]]$PVAL1k[i,j,1]
+        pvalkn = mmiout[[x]]$PVALkn[i,j,1]
+        retval1 = rbind(retval1,c(PVALkn=pvalkn,DELTAkn=mmiout[[x]]$DELTAkn[i,j,1],
+                                  PVAL1k=pval1k,DELTA1k=mmiout[[x]]$DELTA1k[i,j,1],
                                   PVALmindy = mmiout[[x]]$PVALmindy[i,j],DELTAmindy = mmiout[[x]]$DELTAmindy[i,j]))
         retval2 = rbind(retval2,c(MOD=x,TF=i,TRG=j))
       }
@@ -182,6 +315,7 @@ summarization = function(mmiout) {
   }
   return(data.frame(retval1,retval2,stringsAsFactors = F))
 }
+
 
 
 svm.mod = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0.15,S=5,nboot=100,bfrac=0.8,sig=0.05, verbose=T,cl=NULL) {
