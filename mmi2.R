@@ -139,8 +139,8 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
     mipval1k = apply(midelta1k[1:length(midelta1k)] < (mi1k.perm - miall[1:length(miall)]),c(1,2,3),sum)/nboot
     mipvalkn = apply(mideltakn[1:length(mideltakn)] < (mikn.perm - miall[1:length(miall)]),c(1,2,3),sum)/nboot
 
-    deltamindy = mi1k[,,as.character(range[1])] - mikn[,,as.character(range[length(range)])]
-    deltamindy.perm = mi1k.perm[,,as.character(range[1]),] - mikn.perm[,,as.character(range[length(range)]),]
+    deltamindy = mi1k[,,as.character(range[1])] - mikn[,,as.character(range[1])]
+    deltamindy.perm = mi1k.perm[,,as.character(range[1]),] - mikn.perm[,,as.character(range[1]),]
 
     pvalmindy = apply(deltamindy[1:length(deltamindy)] < deltamindy.perm,c(1,2),sum)/nboot
     
@@ -151,8 +151,8 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
       ri = ri + 1
     }
     
-    tfmod[[x]] = list(TARGET=target,TF=tf,DELTA1k=midelta1k,PVAL1k=mipval1k,DELTAkn=mideltakn,PVALkn=mipvalkn,
-                      MIALL=miall,MI1k=mi1k,MIkn=mikn,DELTAmindy=deltamindy,PVALmindy=pvalmindy)
+    tfmod[[x]] = list(DELTA1k=midelta1k,PVAL1k=mipval1k,DELTAkn=mideltakn,PVALkn=mipvalkn,
+                      DELTAmindy=deltamindy,PVALmindy=pvalmindy)
   }
   return(tfmod)
 }
