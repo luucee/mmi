@@ -80,7 +80,7 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
   }
   pval.mod = count/nboot
   pval.mod[1:length(pval.mod)]=p.adjust(pval.mod[1:length(pval.mod)],method = "fdr")
-  mi.mod[pval.mod <= 0.01]=0
+  mi.mod[pval.mod > 0.01]=0
   
   # struttura dati ritornata
   # lista dei geni modulatori (cofattori o target). Per ogni modulatore una matrice 
@@ -92,7 +92,7 @@ mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore
     ptm = proc.time()[3]
     
     # considero solo i tf non dipendenti da x
-    tf = names(mi.mod[x,tflist]>0)
+    tf = names(mi.mod[x,tflist]==0)
     
     # per ogni modulatore candidato x-esimo
     # matrice 3-dimensionale delle MI TF x target x range
@@ -167,8 +167,8 @@ summarization = function(mmiout) {
   retval2 = c()
   for (x in names(mmiout)) {
     cat(x,"\n")
-    b1k = apply(mmiout[[x]]$DELTA1k,c(1,2),which.max)
-    bkn = apply(mmiout[[x]]$DELTAkn,c(1,2),which.max)
+    b1k = apply(mmiout[[x]]$PVAL1k,c(1,2),which.min)
+    bkn = apply(mmiout[[x]]$PVALkn,c(1,2),which.min)
     for (i in rownames(b1k)) {
       for (j in colnames(b1k)) {
         pval1k = mmiout[[x]]$PVAL1k[i,j,b1k[i,j]]

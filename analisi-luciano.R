@@ -58,7 +58,7 @@ s = subset(stab,PVALmindy<0.01)
 good %in% s$MOD
 nrow(s)
 s=s[order(-abs(s$DELTAmindy),s$PVALmindy),]
-
+cumsum(s$MOD %in% good)
 s = subset(stab,PVALkn<0.01)
 good %in% s$MOD
 nrow(s)
