@@ -32,8 +32,31 @@ cl = makePSOCKcluster(10)
 registerDoParallel(cl)
 #out = mmi(geData,tf = tf,target = targets,kordering = kordering,nboot=1000,positiveOnly=F,S=3,cl=cl)
 
-otab = mindy.perm(geData,tflist = tf,target = targets,kordering = kordering,nboot=100,S=3,cl=cl)
-otab[order(otab[,4]),]
+otarget = mindy.perm(geData,tflist = tf,target = targets,kordering = kordering,nboot=100,S=3,cl=cl)
+
+otab= otab[order(otab[,4]),]
+write.xlsx(otab,file="mindy-GBM.xls",row.names = F,sheetName = t ,append = F)
+
+load("geDataGBM.RData")
+
+load("otarget-GBM.Rdata")
+s = subset(otarget$OUT,PVAL<0.01)
+nrow(s)
+
+mod="TBC1D4"
+tf="PPARGC1A"
+t = s[s$TF==tf,]
+
+for (mod in t$MOD) {
+  pdf(paste0(mod,"-",tf,".pdf"))
+  targets = as.character(t[t$MOD==mod,"TRG"])
+  plot.mod(geData,mod,tf,target = targets,
+           nettarget = targets)
+  dev.off()
+}
+
+
+#heatmap.2(geData[targets,],col=redgreen(100),density.info="none",trace="none",scale="none")
 
 
 out = mindy(geData,tf = tf,target = targets,kordering = kordering,nboot=1000,S=3,cl=cl)

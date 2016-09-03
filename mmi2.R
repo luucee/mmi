@@ -31,9 +31,11 @@ mindy.perm = function(mexp,tflist,target,kordering,S=3,nboot=1000,verbose=T,cl=N
   s = subset(stab,PVAL<0.01)
   print(nrow(s))
   ntrg = aggregate(s$TRG,by=list(s$MOD,s$TF),length)
+  trgnames = aggregate(s$TRG,by=list(s$MOD,s$TF),paste,collapse=",")
   ntrg[,4] = 0
   rownames(ntrg) = paste(ntrg[,1],ntrg[,2])
   print(head(ntrg[order(-ntrg[,3]),],20))
+#  return(list(OUT=stab,MOD=ntrg))
   for (i in 1:nboot) {
     cat(i,"\n")
     ptm = proc.time()[3]
@@ -49,7 +51,7 @@ mindy.perm = function(mexp,tflist,target,kordering,S=3,nboot=1000,verbose=T,cl=N
     print(paste0(i," PERMUTATION took ",proc.time()[3]-ptm," sec. "))
   }
   ntrg[,4] = ntrg[,4]/nboot
-  return(ntrg)
+  return(list(OUT=stab,MOD=ntrg))
 }
 
 mindy = function(mexp,tflist,target,mi.mod,kordering,nboot=100,verbose=T,cl=NULL) {
@@ -134,6 +136,42 @@ mindy.sum = function(mmiout,sig=0.05) {
   return(retval)
 }
 
+
+plot.mod = function(mexp,mod,tf,target,nettarget,low=T) {
+  require(amap)
+  # ordino per tf
+  mexp=t(scale(t(mexp)))
+  mexp=mexp[,order(mexp[tf,])]
+  crp = colorRampPalette(c("red","white","green"))
+  colortf = crp(100)[cut(mexp[tf,],100,labels=F)]
+  
+  # ordino per mod
+  ordmod = order(mexp[mod,],decreasing=T)
+  colortf = colortf[ordmod]
+  mexp = mexp[,ordmod]
+  sbin = ncol(mexp) %/% 3
+  
+  # prendo le code ordinate per tf
+  righe = unique(c(tf,target,nettarget))
+  mhigh = mexp[righe,1:sbin]
+  mlow = mexp[righe,(ncol(mexp)-sbin):ncol(mexp)]
+  colhigh = colortf[1:sbin]
+  collow = colortf[(ncol(mexp)-sbin):ncol(mexp)]
+  ordtfhigh = order(mhigh[tf,])
+  ordtflow = order(mlow[tf,])
+  colrighe = rep("blue",length(righe))
+  colrighe[righe %in% nettarget] = "red"
+  colrighe[righe %in% tf] = "yellow"
+  require(gplots)
+  #layout(matrix(c(1,2),1,2), widths=c(50,100), heights=c(50,100), respect=T)
+  
+    heatmap.2(mhigh[,ordtfhigh],col=redgreen(100),dendrogram="none",Colv=F, #ColSideColors=colhigh[ordtfhigh],
+              RowSideColors=colrighe,Rowv=as.dendrogram(hclusterpar(mhigh[,ordtfhigh],method="euclidean",link="ward")),
+              key=F, symkey=FALSE,density.info="none",trace="none",scale="none",main = paste0(mod," -> ",tf," modulator High"))
+    heatmap.2(mlow[,ordtflow],col=redgreen(100),dendrogram="none",Colv=F,#ColSideColors=collow[ordtflow],
+              RowSideColors=colrighe,Rowv=as.dendrogram(hclusterpar(mlow[,ordtflow],method="euclidean",link="ward")),
+              key=F, symkey=FALSE,density.info="none",trace="none",scale="none",main = paste0(mod," -> ",tf," modulator Low"))
+}
 
 mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0.15,S=5,nboot=100,bfrac=0.8,sig=0.05, verbose=T,cl=NULL) {
   # mexp - matrice di espressione (geni sulle righe, samples sulle colonne)
