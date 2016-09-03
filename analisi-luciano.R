@@ -33,6 +33,8 @@ registerDoParallel(cl)
 #out = mmi(geData,tf = tf,target = targets,kordering = kordering,nboot=1000,positiveOnly=F,S=3,cl=cl)
 
 otab = mindy.perm(geData,tflist = tf,target = targets,kordering = kordering,nboot=100,S=3,cl=cl)
+otab[order(otab[,4]),]
+
 
 out = mindy(geData,tf = tf,target = targets,kordering = kordering,nboot=1000,S=3,cl=cl)
 stopCluster(cl)
