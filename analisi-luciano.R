@@ -32,7 +32,7 @@ cl = makePSOCKcluster(10)
 registerDoParallel(cl)
 #out = mmi(geData,tf = tf,target = targets,kordering = kordering,nboot=1000,positiveOnly=F,S=3,cl=cl)
 
-otarget = mindy.perm(geData,tflist = tf,target = targets,kordering = kordering,nboot=100,S=3,cl=cl)
+out = mindy.perm(geData,tflist = tf,target = targets,kordering = kordering,nboot=1000,S=3,cl=cl)
 
 otab= otab[order(otab[,4]),]
 write.xlsx(otab,file="mindy-GBM.xls",row.names = F,sheetName = t ,append = F)
@@ -43,15 +43,20 @@ load("otarget-GBM.Rdata")
 s = subset(otarget$OUT,PVAL<0.01)
 nrow(s)
 
-mod="TBC1D4"
+modl=c("ATP1A1","DSG2","NEXN","LRRFIP1","PLOD3","TBC1D4","CDC42BPA","PIN4","RANBP10","MLPH","PRKCDBP","DRG1")
+modl="TBC1D4"
 tf="PPARGC1A"
-t = s[s$TF==tf,]
 
-for (mod in t$MOD) {
-  pdf(paste0(mod,"-",tf,".pdf"))
-  targets = as.character(t[t$MOD==mod,"TRG"])
-  plot.mod(geData,mod,tf,target = targets,
-           nettarget = targets)
+mexp = cut.outliers(geData)
+
+for (mod in modl) {
+  pdf(paste0(tf,"-",mod,".pdf"))
+  t = s[s$MOD==mod & s$TF==tf,]
+  mdelta=format(mean(t$DELTA),digits = 2)
+  targets = as.character(t$TRG)
+  ntargets = unique(unlist(netReg[[tf]]))
+  plot.mod(mexp,mod,tf,target = targets,
+           nettarget = targets,delta=mdelta)
   dev.off()
 }
 

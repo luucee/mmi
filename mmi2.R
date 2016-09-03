@@ -36,7 +36,7 @@ mindy.perm = function(mexp,tflist,target,kordering,S=3,nboot=1000,verbose=T,cl=N
   rownames(ntrg) = paste(ntrg[,1],ntrg[,2])
   print(head(ntrg[order(-ntrg[,3]),],20))
 #  return(list(OUT=stab,MOD=ntrg))
-  for (i in 1:nboot) {
+  for (i in 1:(nboot/10)) {
     cat(i,"\n")
     ptm = proc.time()[3]
     out.perm = mindy(mexp=mexp,tflist=tflist,target=target,mi.mod=mi.mod,
@@ -136,11 +136,18 @@ mindy.sum = function(mmiout,sig=0.05) {
   return(retval)
 }
 
+cut.outliers = function(mexp) {
+  for(i in 1:nrow(mexp)){
+    mexp[i,] = (mexp[i,]-mean(mexp[i,]))/sd(mexp[i,])
+  }
+  mexp[mexp <= quantile(mexp, 0.05)] = quantile(mexp, 0.05)
+  mexp[mexp >= quantile(mexp, 0.95)] = quantile(mexp, 0.95)
+  return(mexp)
+}
 
-plot.mod = function(mexp,mod,tf,target,nettarget,low=T) {
+plot.mod = function(mexp,mod,tf,target,nettarget,delta="") {
   require(amap)
   # ordino per tf
-  mexp=t(scale(t(mexp)))
   mexp=mexp[,order(mexp[tf,])]
   crp = colorRampPalette(c("red","white","green"))
   colortf = crp(100)[cut(mexp[tf,],100,labels=F)]
@@ -162,15 +169,21 @@ plot.mod = function(mexp,mod,tf,target,nettarget,low=T) {
   colrighe = rep("blue",length(righe))
   colrighe[righe %in% nettarget] = "red"
   colrighe[righe %in% tf] = "yellow"
+  colrighe = colrighe[!righe %in% tf]
   require(gplots)
   #layout(matrix(c(1,2),1,2), widths=c(50,100), heights=c(50,100), respect=T)
-  
-    heatmap.2(mhigh[,ordtfhigh],col=redgreen(100),dendrogram="none",Colv=F, #ColSideColors=colhigh[ordtfhigh],
-              RowSideColors=colrighe,Rowv=as.dendrogram(hclusterpar(mhigh[,ordtfhigh],method="euclidean",link="ward")),
-              key=F, symkey=FALSE,density.info="none",trace="none",scale="none",main = paste0(mod," -> ",tf," modulator High"))
-    heatmap.2(mlow[,ordtflow],col=redgreen(100),dendrogram="none",Colv=F,#ColSideColors=collow[ordtflow],
-              RowSideColors=colrighe,Rowv=as.dendrogram(hclusterpar(mlow[,ordtflow],method="euclidean",link="ward")),
-              key=F, symkey=FALSE,density.info="none",trace="none",scale="none",main = paste0(mod," -> ",tf," modulator Low"))
+  mlow = mlow[!righe %in% tf,]
+  mhigh = mhigh[!righe %in% tf,]
+  heatmap.2(mhigh[,ordtfhigh],col=bluered(100),dendrogram="none",Colv=F, #ColSideColors=colhigh[ordtfhigh],
+            #RowSideColors=colrighe,
+            Rowv=as.dendrogram(hclusterpar(mhigh[,ordtfhigh],method="euclidean",link="ward")),
+            key=F, symkey=FALSE,density.info="none",trace="none",scale="none",
+            main = paste0(mod," -> ",tf," High (",delta,")"))
+  heatmap.2(mlow[,ordtflow],col=bluered(100),dendrogram="none",Colv=F,#ColSideColors=collow[ordtflow],
+            #RowSideColors=colrighe,
+            Rowv=as.dendrogram(hclusterpar(mlow[,ordtflow],method="euclidean",link="ward")),
+            key=F, symkey=FALSE,density.info="none",trace="none",scale="none",
+            main = paste0(mod," -> ",tf," Low (",delta,")"))
 }
 
 mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0.15,S=5,nboot=100,bfrac=0.8,sig=0.05, verbose=T,cl=NULL) {
