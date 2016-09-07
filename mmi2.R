@@ -10,131 +10,153 @@ cohens_d <- function(x, y) {
 }
 
 
-mindy.perm = function(mexp,tflist,target,kordering,S=3,nboot=1000,verbose=T,cl=NULL) {
-  require(parmigene)
-  mexp = mexp[c(tflist,target,rownames(kordering)),]
-  # rimozione mod-tf dipendenti
-  mi.mod = knnmi.cross(mexp[rownames(kordering),],mexp[tflist,])
-  count = mi.mod*0
-  for (bi in 1:nboot) {
-    mi = knnmi.cross(mexp[rownames(kordering),],mexp[tflist,sample(1:ncol(mexp))])
-    count = count + (mi > mi.mod)
+cross.cor <- function(x, y, verbose = TRUE, ncore="all", ...){
+  require(doParallel)
+  if(ncore=="all"){
+    ncore = parallel:::detectCores()
+    doParallel:::registerDoParallel(cores=ncore)
+  } else{
+    doParallel:::registerDoParallel(cores=ncore)
   }
-  pval.mod = count/nboot
-  pval.mod[1:length(pval.mod)]=p.adjust(pval.mod[1:length(pval.mod)],method = "fdr")
-  mi.mod[pval.mod > 0.01]=0
   
+  N <- nrow(x)
+  M <- nrow(y)
   
-  out = mindy(mexp=mexp,tflist=tflist,target=target,mi.mod=mi.mod,kordering=kordering,nboot=nboot,verbose=T,cl=cl)
-  stab=mindy.sum(out)
-  stab$PVAL = p.adjust(stab$PVAL ,method = "fdr")
-  s = subset(stab,PVAL<0.01)
-  print(nrow(s))
-  ntrg = aggregate(s$TRG,by=list(s$MOD,s$TF),length)
-  trgnames = aggregate(s$TRG,by=list(s$MOD,s$TF),paste,collapse=",")
-  ntrg[,4] = 0
-  rownames(ntrg) = paste(ntrg[,1],ntrg[,2])
-  print(head(ntrg[order(-ntrg[,3]),],20))
-#  return(list(OUT=stab,MOD=ntrg))
-  for (i in 1:(nboot/10)) {
-    cat(i,"\n")
-    ptm = proc.time()[3]
-    out.perm = mindy(mexp=mexp,tflist=tflist,target=target,mi.mod=mi.mod,
-                     kordering=t(apply(kordering,1,sample)),nboot=nboot,verbose=T,cl=cl)
-    stab.perm = mindy.sum(out.perm)
-    stab.perm$PVAL = p.adjust(stab.perm$PVAL ,method = "fdr")
-    s = subset(stab.perm,PVAL<0.05)
-    ntrg.perm = aggregate(s$TRG,by=list(s$MOD,s$TF),length)
-    rownames(ntrg.perm) = paste(ntrg.perm[,1],ntrg.perm[,2])
-    ntrg.perm = ntrg.perm[rownames(ntrg.perm) %in% rownames(ntrg),]
-    ntrg[rownames(ntrg.perm),4] = ntrg[rownames(ntrg.perm),4] + (ntrg[rownames(ntrg.perm),3] < ntrg.perm[,3])
-    print(paste0(i," PERMUTATION took ",proc.time()[3]-ptm," sec. "))
-  }
-  ntrg[,4] = ntrg[,4]/nboot
-  return(list(OUT=stab,MOD=ntrg))
+  ntasks <- ncore
+  TM<-round(sqrt(ntasks*M/N))
+  TN<-ntasks %/% TM
+  if (TM==0) TM=1
+  if (TN==0) TN=1
+  
+  Nsize <- N %/% TN
+  Msize <- M %/% TM
+  corMAT<-foreach(i = 1:TN, .combine='rbind') %:% 
+    foreach(j = 1:TM, .combine='cbind') %dopar% {
+      
+      s1<-(i-1)*Nsize+1
+      e1<-s1+Nsize-1
+      s2<-(j-1)*Msize+1
+      e2<-s2+Msize-1     
+      if(i==TN) {
+        e1<-N
+      }
+      if(j==TM) {
+        e2<-M
+      }
+      #cat(s1,e1,s2,e2,"\n")
+      cor(t(x[s1:e1,]), t(y[s2:e2,]), ...)
+    }
+  gc()
+  return(corMAT)
 }
 
-mindy = function(mexp,tflist,target,mi.mod,kordering,nboot=100,verbose=T,cl=NULL) {
 
-  require(parmigene)
+
+mi.ksampled = function(m,r1,r2,k,nboot=100,method="MI") {
+  ptm = proc.time()[3]
+  l1=length(r1)
+  l2=length(r2)
+  m1 = array(0,dim=c(l1*nboot,k))
+  m2 = array(0,dim=c(l2*nboot,k))
+  for (i in 1:nboot) {
+    ksample = sample(1:ncol(m),k)
+    m1[1:l1 + l1*(i-1),] = m[r1,ksample]
+    m2[1:l2 + l2*(i-1),] = m[r2,ksample]
+  }
+  if (method=="MI") {
+    require(parmigene)
+    mi = knnmi.cross(m1,m2)
+  } else if (method=="pearson") {
+    mi = abs(cross.cor(m1,m2))
+    #mi = abs(cor(t(m1),t(m2),method = "pearson"))
+  }
+  print(paste0(" mi.ksampled ",proc.time()[3]-ptm," sec."))
+  return(mi)
+}
+
+mi.split = function(mi,r1,r2) {
+  ptm = proc.time()[3]
+  l1=length(r1)
+  l2=length(r2)
+  nboot = nrow(mi) %/% l1
+  mi.boot = array(0,dim=c(l1,l2,nboot),dimnames=list(r1,r2))
+  mi.perm = array(0,dim=c(l1,l2,nboot**2-nboot),dimnames=list(r1,r2))
+  ni =1
+  for(i in 1:(nboot-1)) {
+    mi.boot[,,i] = mi[1:l1 +l1*(i-1),1:l2 + l2*(i-1)]
+    for(j in (i+1):nboot) {
+      mi.perm[,,ni] = mi[1:l1 +l1*(i-1),1:l2 + l2*(j-1)]
+      ni = ni + 1
+      mi.perm[,,ni] = mi[1:l1 +l1*(j-1),1:l2 + l2*(i-1)]
+      ni = ni + 1
+    }
+  }
+  mi.boot[,,nboot] = mi[1:l1 +l1*(nboot-1),1:l2 + l2*(nboot-1)]
+
+  mi = apply(mi.boot,c(1,2),mean)
+  pval = apply(mi[1:length(mi)] < mi.perm,c(1,2),sum)/(nboot**2-nboot)
   
-  k = ncol(kordering) %/% 3
+  print(paste0(" mi.split ",proc.time()[3]-ptm," sec."))
+  
+  return(list(DELTA=mi,PVAL=pval))
+}
 
+mindy2 = function(mexp,mod,tf,target,nbins=5,h=0,nboot=100,perm=F,siglev=0.05,method="MI",verbose=T) {
   if(verbose) {
     print(paste0("Exp Matrix: ",paste0(dim(mexp),collapse="x")))
+    print(paste0("Modulator: ",mod))
     print(paste0("N° targets: ",length(target)))
-    print(paste0("N° modulators: ",nrow(kordering)))
-    print(paste0("N° TF: ",length(tflist)))
-    print(paste0("Bin size: ",k))
+    print(paste0("N° TF: ",length(tf)))
+    print(paste0("N° bins: ",nbins))
+    print(paste0("N° intra-bins to leave: ",h))
     print(paste0("N° boots: ",nboot))
+    print(paste0("Sig level: ",siglev))
+    print(paste0("Method: ",method))
   }
   
-  # struttura dati ritornata
-  # lista dei geni modulatori (cofattori o target). Per ogni modulatore una matrice 
-  tfmod = list()
-  
-  for (x in rownames(kordering)) {
-    ptm = proc.time()[3]
-    
-    # considero solo i tf non dipendenti da x
-    tf = names(mi.mod[x,tflist]==0)
-    if (length(tf) == 0) {
-      next
-    }
-    
-    # per ogni modulatore candidato x-esimo
-    # matrice 3-dimensionale delle MI TF x target x range
-    mi1k = array(0,dim=c(length(tf),length(target)),dimnames=list(tf,target)) 
-    mikn = mi1k 
-    ksample = 1:k
-    mi1k[,] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-    ksample = (ncol(kordering)-k):ncol(kordering)
-    mikn[,] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-
-    mi1k.perm = array(0,dim=c(length(tf),length(target),nboot),dimnames=list(tf,target)) 
-    mikn.perm = mi1k.perm
-    tmp =   foreach(bi = 1:nboot) %dopar% {
-        require(parmigene)
-        ksample = 1:k
-        tmp.mi1k.perm = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
-        
-        ksample = (ncol(kordering)-k):ncol(kordering)
-        tmp.mikn.perm = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
-        list(Perm1k = tmp.mi1k.perm,Permkn=tmp.mikn.perm)
-        
-      }
-    for (bi in 1:nboot) {
-      mi1k.perm[,,bi] = tmp[[bi]]$Perm1k
-      mikn.perm[,,bi] = tmp[[bi]]$Permkn
-    }
-    deltamindy = mi1k - mikn
-    deltamindy.perm = mi1k.perm - mikn.perm
-    
-    pvalmindy = apply(deltamindy[1:length(deltamindy)] < deltamindy.perm,c(1,2),sum)/nboot
-    
-    if(verbose) {
-      print(paste0(x," took ",proc.time()[3]-ptm," sec. "))
-    }
-    tfmod[[x]] = list(DELTA=deltamindy,PVAL=pvalmindy)
+  dbin = ncol(mexp) %/% nbins
+  kordering = order(mexp[mod,],decreasing = T)
+  if (perm) {
+    kordering = sample(kordering)
   }
-  return(tfmod)
-}
-
-
-mindy.sum = function(mmiout,sig=0.05) {
-  # per ogni modulatore candidato x-esimo 
-  # selezione del miglior k per ogni coppia TF->target
-  # memorizzo solo le coppie TF-target con pval sig
-  retval = NULL
-  for (x in names(mmiout)) {
-    delta = mmiout[[x]]$DELTA
-    pval = mmiout[[x]]$PVAL
-    trgnames = rep(colnames(delta),times=rep(nrow(delta),ncol(delta)))
-    tfnames = rep(rownames(delta),ncol(delta))
-    retval = rbind(retval,data.frame(MOD=x,TF=tfnames,TRG=trgnames,DELTA=delta[1:length(delta)],PVAL=pval[1:length(pval)]))
+  
+  mii=list()
+  for(i in 1:(nbins-1-h)) {
+    ksmpli = 1:(dbin*i)
+    ks=dbin
+    if (method=="pearson") {
+      ks = length(ksmpli)
+    }
+    mii[[i]] = mi.ksampled(mexp[,kordering[ksmpli]],tf,target,k = ks,nboot = nboot,method=method)
+  }
+  mij=list()
+  for(j in (2+h):nbins) {
+    ksmplj = (dbin*(j-1)+1):ncol(mexp)
+    ks=dbin
+    if(method=="pearson") {
+      ks = length(ksmplj)
+    }
+    mij[[j-1]] = mi.ksampled(mexp[,kordering[ksmplj]],tf,target,k = ks,nboot = nboot,method=method)
+  }
+  
+  retval=NULL
+  for(i in 1:(nbins-1-h)) {
+    for(j in (i+1+h):nbins) {
+      dij = mi.split(mii[[i]]-mij[[j-1]],tf,target)
+      
+      trgnames = rep(target,times=rep(length(tf),length(target)))
+      tfnames = rep(tf,length(target))
+      retval=rbind(retval,data.frame(MOD=mod,TF=tfnames,TRG=trgnames,I=i,J=j,
+                              DELTA=dij$DELTA[1:length(dij$DELTA)],PVAL=dij$PVAL[1:length(dij$PVAL)]))
+    }
+  }
+  if(!is.numeric(siglev)) {
+    retval$PVAL = p.adjust(retval$PVAL,method = "fdr")
+    retval = subset(retval,PVAL<siglev)
   }
   return(retval)
 }
+
 
 cut.outliers = function(mexp) {
   for(i in 1:nrow(mexp)){
@@ -145,7 +167,7 @@ cut.outliers = function(mexp) {
   return(mexp)
 }
 
-plot.mod = function(mexp,mod,tf,target,nettarget,delta="") {
+plot.mod = function(mexp,mod,tf,target,nettarget,fus="",high=true) {
   require(amap)
   # ordino per tf
   mexp=mexp[,order(mexp[tf,])]
@@ -156,268 +178,64 @@ plot.mod = function(mexp,mod,tf,target,nettarget,delta="") {
   ordmod = order(mexp[mod,],decreasing=T)
   colortf = colortf[ordmod]
   mexp = mexp[,ordmod]
-  sbin = ncol(mexp) %/% 3
+  sbinhigh = ncol(mexp) %/% 3
+  sbinlow =  ncol(mexp) %/% 3
+
+  # righe da mostrare
+  righe = unique(c(tf,target,nettarget))
   
   # prendo le code ordinate per tf
-  righe = unique(c(tf,target,nettarget))
-  mhigh = mexp[righe,1:sbin]
-  mlow = mexp[righe,(ncol(mexp)-sbin):ncol(mexp)]
-  colhigh = colortf[1:sbin]
-  collow = colortf[(ncol(mexp)-sbin):ncol(mexp)]
+  mhigh = mexp[righe,1:(sbinhigh)]
+  mlow = mexp[righe,(ncol(mexp)-sbinlow):ncol(mexp)]
+  colhigh = colortf[1:(sbinhigh)]
+  collow = colortf[(ncol(mexp)-sbinlow):ncol(mexp)]
   ordtfhigh = order(mhigh[tf,])
   ordtflow = order(mlow[tf,])
+  
   colrighe = rep("blue",length(righe))
   colrighe[righe %in% nettarget] = "red"
   colrighe[righe %in% tf] = "yellow"
   colrighe = colrighe[!righe %in% tf]
+  
+  
   require(gplots)
-  #layout(matrix(c(1,2),1,2), widths=c(50,100), heights=c(50,100), respect=T)
+  colcolhigh1 = rep("not Fused",ncol(mhigh))
+  colcolhigh1[colnames(mhigh) %in% fus] = "Fused"
+  colcollow1 = rep("not Fused",ncol(mlow))
+  colcollow1[colnames(mlow) %in% fus] = "Fused"
+  colcolhigh1=as.factor(colcolhigh1)
+  colcollow1=as.factor(colcollow1)
+  
+  tfhigh=data.frame(colcolhigh1[ordtfhigh],mhigh[tf,ordtfhigh])
+  colnames(tfhigh)=c("TACC3-FGFR3",tf)
+  tflow=data.frame(colcollow1[ordtflow],mlow[tf,ordtflow])
+  colnames(tflow)=c("TACC3-FGFR3",tf)
   mlow = mlow[!righe %in% tf,]
   mhigh = mhigh[!righe %in% tf,]
-  heatmap.2(mhigh[,ordtfhigh],col=bluered(100),dendrogram="none",Colv=F, #ColSideColors=colhigh[ordtfhigh],
-            #RowSideColors=colrighe,
-            Rowv=as.dendrogram(hclusterpar(mhigh[,ordtfhigh],method="euclidean",link="ward")),
-            key=F, symkey=FALSE,density.info="none",trace="none",scale="none",
-            main = paste0(mod," -> ",tf," High (",delta,")"))
-  heatmap.2(mlow[,ordtflow],col=bluered(100),dendrogram="none",Colv=F,#ColSideColors=collow[ordtflow],
-            #RowSideColors=colrighe,
-            Rowv=as.dendrogram(hclusterpar(mlow[,ordtflow],method="euclidean",link="ward")),
-            key=F, symkey=FALSE,density.info="none",trace="none",scale="none",
-            main = paste0(mod," -> ",tf," Low (",delta,")"))
+  print(dim(mhigh))
+  print(dim(mlow))
+  
+  require(heatmap3)
+  if(high) {
+    rownames(mhigh)=rep("",nrow(mhigh))
+    colnames(mhigh)=rep("",ncol(mhigh))
+    ic=heatmap3(mhigh[,ordtfhigh],col=bluered(100),Colv=NA,
+              #RowSideColors=colrighe,
+              #ColSideColors=colcolhigh1[ordtfhigh],
+              ColSideWidth=1,
+              ColSideFun=function(x) showAnn(x),ColSideAnn = tfhigh,
+             showRowDendro=F,method="ward.D2",legendfun=function(x){image(matrix(0),col=0,axes=F)},
+              scale="none",main="Highest")
+  } else {
+    rownames(mlow)=rep("",nrow(mlow))
+    colnames(mlow)=rep("",ncol(mlow))
+    ic=heatmap3(mlow[,ordtflow],col=bluered(100),Colv=NA,
+             #RowSideColors=colrighe,
+             #ColSideColors=colcollow1[ordtflow],
+             ColSideWidth=1,
+             ColSideFun=function(x) showAnn(x),ColSideAnn = tflow,
+             showRowDendro=F,method="ward.D2",legendfun=function(x){image(matrix(0),col=0,axes=F)},
+             scale="none",main="Lowest")
+  }
+  return(ic)
 }
-
-mmi = function(mexp,tflist,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0.15,S=5,nboot=100,bfrac=0.8,sig=0.05, verbose=T,cl=NULL) {
-  # mexp - matrice di espressione (geni sulle righe, samples sulle colonne)
-  # tf - lista dei TF (deve essere un sottoinsieme di rownames(mexp))
-  # target - lista dei target (deve essere un sottoinsieme di rownames(mexp)\tf)
-  # kordering - matrice degli ordinamenti dei samples dei geni ritenuti modulatori
-  #             (rownames(kordering) deve essere un sottinsieme di rownames(mexp))
-  #             (colnames(kordering) deve essere identico a colnames(mexp)))
-  #             Es.
-  #             kordering fatto sulla metilazione dei target (mmet matrice di metilazione con matched samples)
-  #             kordering = t(apply(mmet[target,],1,order,decreasing=F))
-  #             in questo caso ha senso solo alltarget=FALSE e positiveOnly=T
-  #
-  #             kordering fatto sulla espressione di cofattori che modulano la regolazione TF->target
-  #             kordering = t(apply(mexp[cofactors,],1,order,decreasing=F))
-  #             in questo caso ha senso alltarget=TRUE e positiveOnly=F
-  # alltarget - se uguale a TRUE (default) la mutua inf è calcolata su tutti i target, se FALSE è calcolata solo sul modulatore corrente 
-  #             (utile nel caso di kordering fatto sulla metilazione dei target)
-  # positiveOnly - se uguale a TRUE (default) effettua solo il test (1..k) vs all, altrimenti considera anche l'inverso (k..n) vs all
-  # ignore - percentuale dei sample esterni da ignorare quando si calcola la MI
-  # ncore - numero di core per sfruttare il calcolo parallelo
-  # S - numero di samples da raggruppare per la ricerca di k (T=1 il test è fatto per ogni sample)
-  # nboot - numero di bootstrap per generare le distribuzioni
-  # bfrac - frazione dei sample per il bootstrap
-  # sig - livello di significativita per filtrare i risultati
-  
-  require(parmigene)
-  # precondition controls
-  if (!is.matrix(mexp)) 
-    stop("mexp must be a matrix")
-  if ( length(intersect(tflist,rownames(mexp))) != length(tflist) ) 
-    stop("tf must be included in rownames(mexp)")
-  if ( length(intersect(target,rownames(mexp))) != length(target) ) 
-    stop("target must be included in rownames(mexp)")
-  if ( length(intersect(rownames(kordering),rownames(mexp))) != nrow(kordering) ) 
-    stop("rownames(kordering) must be included in rownames(mexp)")
-  if ( length(intersect(colnames(kordering),colnames(mexp))) != ncol(mexp) ) 
-    stop("colnames(kordering) must be equal to colnames(mexp)")
-  
-  
-
-  # ignoro il controllo di un range iniziale e finale con pochi sample
-  # mi aspetto che il k risieda piu internamente
-  #inizio = round(ncol(kordering)*ignore)
-  #range= inizio:(ncol(kordering)-inizio)
-  #range = range[seq(1,length(range),S)] # prendo ogni S sample per ridurre il numero di k da controllare
-  sbin = ncol(kordering) %/% S
-  range = seq(0,ncol(kordering),sbin)
-  range = range[-1]
-  if ((sbin*S)<=ncol(kordering)) {
-    range = range[-length(range)]
-  }
-  
-  if(verbose) {
-    print(paste0("Exp Matrix: ",paste0(dim(mexp),collapse="x")))
-    print(paste0("N° targets: ",length(target)))
-    print(paste0("N° modulators: ",nrow(kordering)))
-    print(paste0("N° TF: ",length(tflist)))
-    print(paste0("N° intervals: ",length(range)))
-    print(paste0("Bin size: ",sbin))
-    print(paste0("N° boots: ",nboot))
-  }
-  
-  # rimozione mod-tf dipendenti
-  mi.mod = knnmi.cross(mexp[rownames(kordering),],mexp[tflist,])
-  count = mi.mod*0
-  for (bi in 1:nboot) {
-    mi = knnmi.cross(mexp[rownames(kordering),],mexp[tflist,sample(1:ncol(mexp))])
-    count = count + mi>mi.mod
-  }
-  pval.mod = count/nboot
-  pval.mod[1:length(pval.mod)]=p.adjust(pval.mod[1:length(pval.mod)],method = "fdr")
-  mi.mod[pval.mod > 0.01]=0
-  
-  # struttura dati ritornata
-  # lista dei geni modulatori (cofattori o target). Per ogni modulatore una matrice 
-  tfmod = list()
-  
-  if(!verbose) pb = txtProgressBar(min=1,max=nrow(kordering),style=3) 
-  ri = 1 # contatore per la progress bar
-  for (x in rownames(kordering)) {
-    ptm = proc.time()[3]
-    
-    # considero solo i tf non dipendenti da x
-    tf = names(mi.mod[x,tflist]==0)
-    
-    # per ogni modulatore candidato x-esimo
-    # matrice 3-dimensionale delle MI TF x target x range
-    mi1k = array(0,dim=c(length(tf),length(target),length(range)),dimnames=list(tf,target,range)) 
-    mikn = mi1k 
-    for (k in range) {
-      ksample = 1:k
-      mi1k[,,as.character(k)] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-      if(!positiveOnly) {
-        ksample = (ncol(kordering)-k):ncol(kordering)
-        mikn[,,as.character(k)] = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-      }
-    }
-    
-    miall.boot = array(0,dim=c(length(tf),length(target),length(range),nboot),dimnames=list(tf,target,range)) 
-    mi1k.perm = miall.boot
-    mikn.perm = miall.boot
-    tmp = foreach (k = range) %:%
-      foreach(bi = 1:nboot) %dopar% {
-        require(parmigene)
-        # all
-        ksample = sample(1:ncol(kordering),k)
-        tmp.miall = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,ksample]])
-
-        ksample = 1:k
-        tmp.mi1k.perm = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
-        
-        ksample = (ncol(kordering)-k):ncol(kordering)
-        tmp.mikn.perm = knnmi.cross(mexp[tf,kordering[x,ksample]],mexp[target,kordering[x,sample(ksample)]])
-        list(BootAll = tmp.miall,Perm1k = tmp.mi1k.perm,Permkn=tmp.mikn.perm)
-        
-      }
-    for (bi in 1:nboot) {
-      for (k in 1:length(range)) {
-        miall.boot[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$BootAll
-        mi1k.perm[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$Perm1k
-        mikn.perm[,,as.character(range[k]),bi] = tmp[[k]][[bi]]$Permkn
-      }
-    }
-    miall = apply(miall.boot,c(1,2,3),median)
-    midelta1k = mi1k - miall    
-    mideltakn = mikn - miall
-
-    mipval1k = apply(midelta1k[1:length(midelta1k)] < (mi1k.perm - miall[1:length(miall)]),c(1,2,3),sum)/nboot
-    mipvalkn = apply(mideltakn[1:length(mideltakn)] < (mikn.perm - miall[1:length(miall)]),c(1,2,3),sum)/nboot
-
-    deltamindy = mi1k[,,as.character(range[1])] - mikn[,,as.character(range[1])]
-    deltamindy.perm = mi1k.perm[,,as.character(range[1]),] - mikn.perm[,,as.character(range[1]),]
-
-    pvalmindy = apply(deltamindy[1:length(deltamindy)] < deltamindy.perm,c(1,2),sum)/nboot
-    
-    if(verbose) {
-      print(paste0(x," took ",proc.time()[3]-ptm," sec. "))
-    } else {
-      setTxtProgressBar(pb, ri)
-      ri = ri + 1
-    }
-    
-    tfmod[[x]] = list(DELTA1k=midelta1k,PVAL1k=mipval1k,DELTAkn=mideltakn,PVALkn=mipvalkn,
-                      DELTAmindy=deltamindy,PVALmindy=pvalmindy)
-  }
-  return(tfmod)
-}
-
-
-
-summarization = function(mmiout) {
-  # per ogni modulatore candidato x-esimo 
-  # selezione del miglior k per ogni coppia TF->target
-  # memorizzo solo le coppie TF-target con pval sig
-  retval1 = c()
-  retval2 = c()
-  for (x in names(mmiout)) {
-    cat(x,"\n")
-    #b1k = apply(mmiout[[x]]$PVAL1k,c(1,2),which.min)
-    #bkn = apply(mmiout[[x]]$PVALkn,c(1,2),which.min)
-    b1k=mmiout[[x]]$DELTAkn
-    for (i in rownames(b1k)) {
-      for (j in colnames(b1k)) {
-        pval1k = mmiout[[x]]$PVAL1k[i,j,1]
-        pvalkn = mmiout[[x]]$PVALkn[i,j,1]
-        retval1 = rbind(retval1,c(PVALkn=pvalkn,DELTAkn=mmiout[[x]]$DELTAkn[i,j,1],
-                                  PVAL1k=pval1k,DELTA1k=mmiout[[x]]$DELTA1k[i,j,1],
-                                  PVALmindy = mmiout[[x]]$PVALmindy[i,j],DELTAmindy = mmiout[[x]]$DELTAmindy[i,j]))
-        retval2 = rbind(retval2,c(MOD=x,TF=i,TRG=j))
-      }
-    }
-  }
-  return(data.frame(retval1,retval2,stringsAsFactors = F))
-}
-
-
-
-svm.mod = function(mexp,tf,target,kordering,alltarget=TRUE,positiveOnly=F,ignore = 0.15,S=5,nboot=100,bfrac=0.8,sig=0.05, verbose=T,cl=NULL) {
-  # mexp - matrice di espressione (geni sulle righe, samples sulle colonne)
-  # tf - lista dei TF (deve essere un sottoinsieme di rownames(mexp))
-  # target - lista dei target (deve essere un sottoinsieme di rownames(mexp)\tf)
-  # kordering - matrice degli ordinamenti dei samples dei geni ritenuti modulatori
-  #             (rownames(kordering) deve essere un sottinsieme di rownames(mexp))
-  #             (colnames(kordering) deve essere identico a colnames(mexp)))
-  #             Es.
-  #             kordering fatto sulla metilazione dei target (mmet matrice di metilazione con matched samples)
-  #             kordering = t(apply(mmet[target,],1,order,decreasing=F))
-  #             in questo caso ha senso solo alltarget=FALSE e positiveOnly=T
-  #
-  #             kordering fatto sulla espressione di cofattori che modulano la regolazione TF->target
-  #             kordering = t(apply(mexp[cofactors,],1,order,decreasing=F))
-  #             in questo caso ha senso alltarget=TRUE e positiveOnly=F
-  # alltarget - se uguale a TRUE (default) la mutua inf è calcolata su tutti i target, se FALSE è calcolata solo sul modulatore corrente 
-  #             (utile nel caso di kordering fatto sulla metilazione dei target)
-  # positiveOnly - se uguale a TRUE (default) effettua solo il test (1..k) vs all, altrimenti considera anche l'inverso (k..n) vs all
-  # ignore - percentuale dei sample esterni da ignorare quando si calcola la MI
-  # ncore - numero di core per sfruttare il calcolo parallelo
-  # S - numero di samples da raggruppare per la ricerca di k (T=1 il test è fatto per ogni sample)
-  # nboot - numero di bootstrap per generare le distribuzioni
-  # bfrac - frazione dei sample per il bootstrap
-  # sig - livello di significativita per filtrare i risultati
-  require(kernlab)
-  
-  for (x in rownames(kordering)) {
-    # per ogni modulatore candidato x-esimo
-    # generazione del training sample
-    kordering[x,]
-  tpos = NULL
-  tneg = NULL
-  for(i in 1:100) {
-    trgi = sample(1:nrow(mexp),1)
-    ptrg = sort(sample(mexp[trgi,],length(A)))
-    ptrg[order(mexp[tfi,A])] = ptrg
-    mvec = sort(mmet[trgi,])
-    evec = sort(mexp[trgi,])
-    tpos=rbind(tpos,c(ptrg,
-                      sample(evec[1:length(B)]),
-                      sample(mvec[1:length(A)]),
-                      sample(mvec[(length(A)+1):length(mvec)])))
-    
-    
-    #trgi = sample(1:nrow(mexp),1)
-    ntrg=c(sample(mexp[trgi,A]),sample(mmet[trgi,]))
-    tneg=rbind(tneg,c(sample(mexp[trgi,A]),
-                      sample(mexp[trgi,],length(B)),
-                      sample(mmet[trgi,])))
-  }
-  rownames(tpos)=NULL
-  rownames(tneg)=NULL
-  }
-  
-}
-
-
-

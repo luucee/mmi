@@ -30,57 +30,60 @@ names(mod) = t$V1
 #tfmodulators = lapply(tfmodulators, function(x) unique(unlist(pwg[x])))
 
 # rimozione probe con poca variabilita'
-iqr <- apply(mexp, 1, IQR, na.rm = TRUE)
-var.cutoff = quantile(iqr, 0.1, na.rm=TRUE) # percentuale che ne butta fuori
-selected = iqr > var.cutoff
-M <- mexp[selected, ]
-dim(M)
-colnames(M) = paste0("S",1:ncol(M))
+#iqr <- apply(mexp, 1, IQR, na.rm = TRUE)
+#var.cutoff = quantile(iqr, 0.1, na.rm=TRUE) # percentuale che ne butta fuori
+#selected = iqr > var.cutoff
+#M <- mexp[selected, ]
+#M <- mexp
+#dim(M)
 
 # prova con tf dell'oracolo
-tf = names(mod)
-modulators = c("ABL1","BTK","EGFR") 
-#unique(unlist(mod))
+tf = names(trg)
+modulators = unique(unlist(mod))
 targets = unique(unlist(trg))
 targets=targets[targets %in% rownames(M)]
 modulators=modulators[modulators %in% rownames(M)]
+for (tt in names(mod)) { # per l'oracolo solo quelli che esistono nei dati
+  mod[[tt]] = mod[[tt]][mod[[tt]] %in% modulators]
+}
 
-# Prendo solo i target che hanno un motif di qualche TF sul promotore
-#load("motifRanges.Rdata")
-#motifRanges
-#motifRanges=motifRanges[motifRanges$qvalue<=0.05]
+source("mmi2.R")
+# signif dei delta
+out = foreach(mod = modulators, .combine = "rbind") %do% {
+  ptm = proc.time()[3]
+  mindy2(mexp,mod=mod,tf=tf,target = targets,nboot = 80,nbins=5,h=1,siglev=0.05,method="pearson") # equiv mindy (nbins=3 h=1)
+  print(paste0(mod," took ",proc.time()[3]-ptm," sec."))
+}
+save(out,file="out-ATLAS.Rdata")
+load("out-ATLAS.Rdata")
+out.sig = subset(out,(DELTA>0.4 | DELTA< -0.4) & PVAL<0.01)
+nrow(out.sig)
+ntrg = aggregate(out.sig$TRG,by=list(out.sig$MOD,out.sig$TF),function(x) length(unique(x)))
+ntrg[,4] = 0
+ntrg[,5] = aggregate(out.sig$DELTA,by=list(out.sig$MOD,out.sig$TF),mean)[,3]
 
-#sum(tf %in% motifRanges$TF)
-#trg=unique(motifRanges$TARGET[motifRanges$TF %in% tf])
-#trg=trg[trg %in% rownames(M)]
-#length(trg)
-#tf = tf[tf %in% motifRanges$TF]
-#target = trg
 
-#modulators=sample(modulators,3)
-kordering = t(apply(M[modulators,],1,order,decreasing=T))
-colnames(kordering) = colnames(M)
-library(foreach)
-library(doParallel)
-cl = makePSOCKcluster(10)
-registerDoParallel(cl)
-out = mmi(M,tf = tf,target = targets,kordering = kordering,nboot=1000,positiveOnly=F,S=4,sig = 0.01,cl=cl)
-stopCluster(cl)
+# significativita dei num di target per ogni mod-tf
+outperm = foreach(b=1:1000, .combine = "rbind") %dopar% {
+  outp = mindy2(M,mod=modulators[1],tf=tf,target = targets,nboot = 80,nbins=5,h=1,perm=T,siglev=0.05,method="pearson")
+  outp$B=b
+  outp
+}
+save(outperm,file="outperm-ATLAS.Rdata")
+load("outperm-ATLAS.Rdata")
 
-# test prediction performance
+outperm.sig = subset(outperm,PVAL<0.1)
 
-miotf="E2F1" #"ETS1"
-miomod=modulators[modulators %in% tfmodulators[[miotf]]]
-notmod=setdiff(modulators,miomod)
+ntrg.perm = aggregate(outperm.sig$TRG,by=list(outperm.sig$MOD,outperm.sig$TF,outperm.sig$B),function(x) length(unique(x)))
+for(i in 1:nrow(ntrg)) {
+  mod=as.character(ntrg[i,1])
+  tf=as.character(ntrg[i,2])
+  ntrg[i,4] = sum(ntrg[i,3] < ntrg.perm[ntrg.perm$MOD==mod & ntrg.perm$TF==tf,4])/1000
+}
 
-w=out[[miomod[2]]][[miotf]]
-w=w[w[,"DIRECTION"]==1,]
-w=w[order(w[,"DELTA"]*(1-w[,"FDR"]),decreasing=T),]
-w[1:10,]
-w=out[[notmod[2]]][[miotf]]
-w=w[w[,"DIRECTION"]==1,]
-w=w[order(w[,"DELTA"]*(1-w[,"FDR"]),decreasing=T),]
-w[1:10,]
+colnames(ntrg) = c("MOD","TF","N.TRG","PVAL")
+
+
 
 # costruzione oracolo lista inversa TF -> modulator
 tfpred =list()
