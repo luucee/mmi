@@ -56,9 +56,10 @@ mi.ksampled = function(m,r1,r2,k,nboot=100,method="MI") {
   ptm = proc.time()[3]
   l1=length(r1)
   l2=length(r2)
-  m1 = array(0,dim=c(l1*nboot,k))
-  m2 = array(0,dim=c(l2*nboot,k))
-  for (i in 1:nboot) {
+  xnboot = round(sqrt(nboot))
+  m1 = array(0,dim=c(l1*xnboot,k))
+  m2 = array(0,dim=c(l2*xnboot,k))
+  for (i in 1:xnboot) {
     ksample = sample(1:ncol(m),k)
     m1[1:l1 + l1*(i-1),] = m[r1,ksample]
     m2[1:l2 + l2*(i-1),] = m[r2,ksample]

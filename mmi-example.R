@@ -17,8 +17,8 @@ t$V2 = gsub("[ |\\n|\\r]","",t$V2)
 t$V3 = gsub("[ |\\n|\\r]","",t$V3)
 trg=strsplit(t$V2,",")
 names(trg) = t$V1
-mod=strsplit(t$V3,",")
-names(mod) = t$V1
+modlist=strsplit(t$V3,",")
+names(modlist) = t$V1
 
 #t=read.table("pathways-genes.txt",sep="\t",header=F,stringsAsFactors = F)
 #pwg=strsplit(t$V2,", ")
@@ -39,12 +39,12 @@ names(mod) = t$V1
 
 # prova con tf dell'oracolo
 tf = names(trg)
-modulators = unique(unlist(mod))
+modulators = unique(unlist(modlist))
 targets = unique(unlist(trg))
-targets=targets[targets %in% rownames(M)]
-modulators=modulators[modulators %in% rownames(M)]
-for (tt in names(mod)) { # per l'oracolo solo quelli che esistono nei dati
-  mod[[tt]] = mod[[tt]][mod[[tt]] %in% modulators]
+targets=targets[targets %in% rownames(mexp)]
+modulators=modulators[modulators %in% rownames(mexp)]
+for (tt in names(modlist)) { # per l'oracolo solo quelli che esistono nei dati
+  modlist[[tt]] = modlist[[tt]][modlist[[tt]] %in% modulators]
 }
 
 source("mmi2.R")
