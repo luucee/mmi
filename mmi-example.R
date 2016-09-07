@@ -46,17 +46,41 @@ modulators=modulators[modulators %in% rownames(mexp)]
 for (tt in names(modlist)) { # per l'oracolo solo quelli che esistono nei dati
   modlist[[tt]] = modlist[[tt]][modlist[[tt]] %in% modulators]
 }
+oracle=NULL
+for(tt in names(modlist)) {
+  oracle=rbind(oracle,data.frame(TF=tt,MOD=modlist[[tt]]))
+}
+oracle=paste(oracle$MOD,oracle$TF)
 
 source("mmi2.R")
 # signif dei delta
-out = foreach(mod = modulators, .combine = "rbind") %do% {
+out = NULL
+for(mod in modulators) {
   ptm = proc.time()[3]
-  mindy2(mexp,mod=mod,tf=tf,target = targets,nboot = 80,nbins=5,h=1,siglev=0.05,method="pearson") # equiv mindy (nbins=3 h=1)
+  out=rbind(out,mindy2(mexp,mod=mod,tf=tf,target = targets,nboot = 1000,nbins=3,h=1,siglev=0.01,method="pearson")) # equiv mindy (nbins=3 h=1)
   print(paste0(mod," took ",proc.time()[3]-ptm," sec."))
 }
 save(out,file="out-ATLAS.Rdata")
 load("out-ATLAS.Rdata")
-out.sig = subset(out,(DELTA>0.4 | DELTA< -0.4) & PVAL<0.01)
+out=subset(out,PVAL<0.01)
+out$PVAL=p.adjust(out$PVAL,method = "fdr")
+require(ROCR)
+layout(matrix(1:3,nrow=1,ncol=3))
+for (tt in tf) {
+  x = out[out$TF==tt,]
+  f=paste(x$MOD,x$TF)
+  pred = prediction(abs(x$DELTA),f %in% oracle)
+  perf = performance(pred,measure="prec",x.measure="rec")
+  plot(perf,ylim=c(0,1),xlim=c(0,0.1),main=tt)
+}
+
+
+
+perf = performance(pred,measure="tpr",x.measure="fpr")
+plot(perf)
+perf = performance(pred,measure="auc")
+
+out.sig = subset(out,(DELTA>0.3 | DELTA< -0.3) & PVAL<0.05)
 nrow(out.sig)
 ntrg = aggregate(out.sig$TRG,by=list(out.sig$MOD,out.sig$TF),function(x) length(unique(x)))
 ntrg[,4] = 0
@@ -64,8 +88,8 @@ ntrg[,5] = aggregate(out.sig$DELTA,by=list(out.sig$MOD,out.sig$TF),mean)[,3]
 
 
 # significativita dei num di target per ogni mod-tf
-outperm = foreach(b=1:1000, .combine = "rbind") %dopar% {
-  outp = mindy2(M,mod=modulators[1],tf=tf,target = targets,nboot = 80,nbins=5,h=1,perm=T,siglev=0.05,method="pearson")
+outperm = foreach(b=1:100, .combine = "rbind") %dopar% {
+  outp = mindy2(M,mod=modulators[1],tf=tf,target = targets,nboot = 1000,nbins=3,h=1,perm=T,siglev="none",method="pearson")
   outp$B=b
   outp
 }

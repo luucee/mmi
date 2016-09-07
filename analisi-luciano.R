@@ -44,10 +44,10 @@ cl = makePSOCKcluster(10)
 registerDoParallel(cl)
 
 # signif dei delta
-out = foreach(mod = modulators, .combine = "rbind") %do% {
-  cat(mod,"\n")
+out = NULL
+for(mod in modulators) {
   ptm = proc.time()[3]
-  mindy2(geData,mod=mod,tf=tf,target = targets,nboot = 80,nbins=5,h=1,siglev=0.05,method="pearson") # equiv mindy (nbins=3 h=1)
+  out=rbind(out,mindy2(geData,mod=mod,tf=tf,target = targets,nboot = 10000,nbins=3,h=1,siglev=0.05,method="pearson")) # equiv mindy (nbins=3 h=1)
   print(paste0(mod," took ",proc.time()[3]-ptm," sec."))
 }
 save(out,file="out-Panglioma.Rdata")

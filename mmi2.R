@@ -123,7 +123,8 @@ mindy2 = function(mexp,mod,tf,target,nbins=5,h=0,nboot=100,perm=F,siglev=0.05,me
   
   mii=list()
   for(i in 1:(nbins-1-h)) {
-    ksmpli = 1:(dbin*i)
+    #ksmpli = 1:(dbin*i)
+    ksmpli = (dbin*(i-1)+1):(dbin*i)
     ks=dbin
     if (method=="pearson") {
       ks = length(ksmpli)
@@ -132,7 +133,8 @@ mindy2 = function(mexp,mod,tf,target,nbins=5,h=0,nboot=100,perm=F,siglev=0.05,me
   }
   mij=list()
   for(j in (2+h):nbins) {
-    ksmplj = (dbin*(j-1)+1):ncol(mexp)
+    #ksmplj = (dbin*(j-1)+1):ncol(mexp)
+    ksmplj = (dbin*(j-1)+1):(dbin*j)
     ks=dbin
     if(method=="pearson") {
       ks = length(ksmplj)
