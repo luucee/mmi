@@ -95,7 +95,7 @@ mi.split = function(mi,r1,r2) {
   mi.boot[,,nboot] = mi[1:l1 +l1*(nboot-1),1:l2 + l2*(nboot-1)]
 
   mi = apply(mi.boot,c(1,2),mean)
-  pval = apply(mi[1:length(mi)] < mi.perm,c(1,2),sum)/(nboot**2-nboot)
+  pval = apply(abs(mi[1:length(mi)]) < abs(mi.perm),c(1,2),sum)/(nboot**2-nboot)
   
   print(paste0(" mi.split ",proc.time()[3]-ptm," sec."))
   
@@ -143,7 +143,7 @@ mindy2 = function(mexp,mod,tf,target,nbins=5,h=0,nboot=100,perm=F,siglev=0.05,me
   retval=NULL
   for(i in 1:(nbins-1-h)) {
     for(j in (i+1+h):nbins) {
-      dij = mi.split(mii[[i]]-mij[[j-1]],tf,target)
+      dij = mi.split(mii[[i]] - mij[[j-1]],tf,target)
       
       trgnames = rep(target,times=rep(length(tf),length(target)))
       tfnames = rep(tf,length(target))
