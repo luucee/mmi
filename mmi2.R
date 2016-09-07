@@ -151,7 +151,7 @@ mindy2 = function(mexp,mod,tf,target,nbins=5,h=0,nboot=100,perm=F,siglev=0.05,me
                               DELTA=dij$DELTA[1:length(dij$DELTA)],PVAL=dij$PVAL[1:length(dij$PVAL)]))
     }
   }
-  if(!is.numeric(siglev)) {
+  if(is.numeric(siglev)) {
     retval$PVAL = p.adjust(retval$PVAL,method = "fdr")
     retval = subset(retval,PVAL<siglev)
   }
