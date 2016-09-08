@@ -109,7 +109,7 @@ mi.split = function(mi,r1,r2) {
   pval2[pval2>pval1] = pval1[pval2>pval1] 
   #pval1[pval1>pval2] = pval2[pval1>pval2]
   
-  return(list(DELTA=mi,PVAL=pval2,MIP=mi.perm))
+  return(list(DELTA=mi,PVAL=pval2))
 }
 
 mindy2 = function(mexp,mod,tf,target,nbins=5,h=0,nboot=100,perm=F,siglev=0.05,method="MI",verbose=T,scale=F) {
@@ -156,7 +156,6 @@ mindy2 = function(mexp,mod,tf,target,nbins=5,h=0,nboot=100,perm=F,siglev=0.05,me
   for(i in 1:(nbins-1-h)) {
     for(j in (i+1+h):nbins) {
       dij = mi.split(mii[[i]] - mij[[j-1]],tf,target)
-      return(dij)
       trgnames = rep(target,times=rep(length(tf),length(target)))
       tfnames = rep(tf,length(target))
       retval=rbind(retval,data.frame(MOD=mod,TF=tfnames,TRG=trgnames,I=i,J=j,
