@@ -10,6 +10,7 @@ source("mmi2.R")
 #rownames(mexp) = allgenes
 #save(tf,modulators,allgenes,mexp,file="ATLAS_dataset.Rdata")
 load(file="ATLAS_dataset.Rdata",verbose=T)
+mexp=mexp[rownames(mexp)!="NA",]
 
 # Recupero goldstandard dalle tabelle del paper
 t = read.table("tf-modulators-targets.txt",sep="\t",stringsAsFactors = F)
@@ -51,19 +52,22 @@ for(tt in names(modlist)) {
   oracle=rbind(oracle,data.frame(TF=tt,MOD=modlist[[tt]]))
 }
 oracle=paste(oracle$MOD,oracle$TF)
-
+a=t(scale(t(mexp)))
 source("mmi2.R")
 # signif dei delta
 out = NULL
 for(mod in modulators) {
   ptm = proc.time()[3]
-  out=rbind(out,mindy2(mexp,mod=mod,tf=tf,target = targets,nboot = 1000,nbins=3,h=1,siglev=0.01,method="pearson")) # equiv mindy (nbins=3 h=1)
+  out=rbind(out,mindy2(mexp,mod=mod,tf=tf,target = rownames(mexp),nboot = 100,nbins=3,h=1,siglev=0.01,method="pearson")) # equiv mindy (nbins=3 h=1)
   print(paste0(mod," took ",proc.time()[3]-ptm," sec."))
 }
 save(out,file="out-ATLAS.Rdata")
 load("out-ATLAS.Rdata")
-out=subset(out,PVAL<0.01)
 out$PVAL=p.adjust(out$PVAL,method = "fdr")
+out = subset(out,PVAL<0.01 & DELTA>0.4)
+out[order(out$DELTA),]
+out = aggregate(out$DELTA,by=list(out$MOD,out$TF),function(x) max(abs(x)))
+
 require(ROCR)
 layout(matrix(1:3,nrow=1,ncol=3))
 for (tt in tf) {
@@ -74,7 +78,15 @@ for (tt in tf) {
   plot(perf,ylim=c(0,1),xlim=c(0,0.1),main=tt)
 }
 
+mexps = cut.outliers(mexp)
+mytf="TP53"
+mymod="ATM" #modlist[[mytf]][3]
+x=mindy2(mexp,mod=mymod,tf=names(modlist),target = rownames(mexp),nboot = 1000,nbins=3,h=1,siglev=0.01,method="pearson")
 
+mytf="MYC"
+tt = trg[[mytf]]
+tt = as.character(out[out$MOD==mymod & out$TF==mytf,"TRG"])
+plot.mod(mexps,mod=mymod,tf = mytf,target = tt,nettarget = tt,high=T)
 
 perf = performance(pred,measure="tpr",x.measure="fpr")
 plot(perf)

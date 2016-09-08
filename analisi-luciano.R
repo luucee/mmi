@@ -56,9 +56,10 @@ load("out-Panglioma.Rdata")
 load("out-GBM.Rdata")
 load("out-bins4-GBM.Rdata")
 load("out-alltargets-GBM.Rdata")
+summary(out)
 
 #out$PVAL = p.adjust(out$PVAL,method = "fdr")
-out.sig = subset(out,(DELTA>0.4 | DELTA< -0.4) & PVAL<0.01)
+out.sig = subset(out,(DELTA > 0.45))
 nrow(out.sig)
 ntrg = aggregate(out.sig$TRG,by=list(out.sig$MOD,out.sig$TF),function(x) length(unique(x)))
 ntrg[,4] = 0
@@ -66,30 +67,38 @@ ntrg[,5] = aggregate(out.sig$DELTA,by=list(out.sig$MOD,out.sig$TF),mean)[,3]
 
 
 # significativita dei num di target per ogni mod-tf
-outperm = foreach(b=1:1000, .combine = "rbind") %dopar% {
-    outp = mindy2(geData,mod=modulators[1],tf=tf,target = targets,nboot = 80,nbins=5,h=1,perm=T,siglev=0.05,method="pearson")
-    outp$B=b
-    outp
+outperm = NULL
+for(b in 1:100)  {
+  ptm = proc.time()[3]
+  outp=mindy2(geData,mod=modulators[1],tf=tf,target = targets,nboot = 10000,nbins=3,h=1,perm=T,siglev=0.05,method="pearson")
+  outp$B=b
+  outperm = rbind(outperm,outp)
+  print(paste0(b," boot took ",proc.time()[3]-ptm," sec."))
 }
 save(outperm,file="outperm-Panglioma.Rdata")
 save(outperm,file="outperm-GBM.Rdata")
 load("outperm-Panglioma.Rdata")
 load("outperm-GBM.Rdata")
 load("outperm-bins4-GBM.Rdata")
+load("outperm-alltargets-GBM.Rdata")
+summary(outperm)
 
 for(m in unique(as.character(outperm$MOD))) {
   outperm$PVAL[outperm$MOD==m] = p.adjust(outperm$PVAL[outperm$MOD==m],method = "fdr")
 }
-outperm.sig = subset(outperm,PVAL<0.1)
+
+outperm.sig = subset(outperm,(DELTA > 0.45))
+nrow(outperm.sig)
 
 ntrg.perm = aggregate(outperm.sig$TRG,by=list(outperm.sig$MOD,outperm.sig$TF,outperm.sig$B),function(x) length(unique(x)))
 for(i in 1:nrow(ntrg)) {
   mod=as.character(ntrg[i,1])
   tf=as.character(ntrg[i,2])
-  ntrg[i,4] = sum(ntrg[i,3] < ntrg.perm[ntrg.perm$MOD==mod & ntrg.perm$TF==tf,4])/1000
+  ntrg[i,4] = sum(ntrg[i,3] < ntrg.perm[ntrg.perm$MOD==mod & ntrg.perm$TF==tf,4])/100
 }
 
 colnames(ntrg) = c("MOD","TF","N.TRG","PVAL")
+ntrg[ntrg$PVAL<0.01,]
 
 require(xlsx)
 write.xlsx(ntrg,file="modlist.xls",row.names = F,sheetName = "Panglioma" ,append = T)
@@ -103,12 +112,27 @@ for (mod in as.character(ntrg$MOD[ntrg$TF==mytf])) {
   f=out.sig[out.sig$MOD==mod & out.sig$TF==mytf,]
   trg = unique(as.character(f$TRG))
   cat(length(trg),"\n")
-  if (length(trg)>=30) {
-    pdf(paste0(mytf,"-",mod,"-high.pdf"))
+  if (length(trg)>=10) {
+    fhigh=paste0(mytf,"-",mod,"-high")
+    flow=paste0(mytf,"-",mod,"-low")
+    con=file(description = paste0("outfigs/HIGH-",mytf,"-",mod,".tex"), open = "w")
+    writeLines('\\documentclass[margin=5mm]{standalone}',con)
+    writeLines('\\usepackage{graphics}',con)
+    writeLines('\\usepackage{helvet}',con)
+    writeLines('\\begin{document}',con)
+    writeLines('\\begin{tabular}{cc}',con)
+    writeLines(paste0('\\multicolumn{2}{c}{{{\\fontfamily{phv}\\selectfont {\\huge ',mod,' }}}}\\\\'),con)
+    writeLines(paste0('\\includegraphics{',flow,'} &'),con)
+    writeLines(paste0('\\includegraphics{',fhigh,'} \\\\'),con)
+    writeLines('\\end{tabular}',con)
+    writeLines('\\end{document}',con)
+    close(con)
+    
+    pdf(paste0("outfigs/",fhigh,".pdf"))
     plot.mod(mexp,mod,mytf,target = trg,
              nettarget = trg,fus=fus,high=T)
     dev.off()
-    pdf(paste0(mytf,"-",mod,"-low.pdf"))
+    pdf(paste0("outfigs/",flow,".pdf"))
     plot.mod(mexp,mod,mytf,target = trg,
              nettarget = trg,fus=fus,high=F)
     dev.off()

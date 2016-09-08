@@ -18,7 +18,6 @@ cross.cor <- function(x, y, verbose = TRUE, ncore="all", ...){
   } else{
     doParallel:::registerDoParallel(cores=ncore)
   }
-  
   N <- nrow(x)
   M <- nrow(y)
   
@@ -93,16 +92,27 @@ mi.split = function(mi,r1,r2) {
     }
   }
   mi.boot[,,nboot] = mi[1:l1 +l1*(nboot-1),1:l2 + l2*(nboot-1)]
-
   mi = apply(mi.boot,c(1,2),mean)
-  pval = apply(abs(mi[1:length(mi)]) < abs(mi.perm),c(1,2),sum)/(nboot**2-nboot)
   
-  print(paste0(" mi.split ",proc.time()[3]-ptm," sec."))
+  #mi.perm[mi.perm<0] = mi.perm[mi.perm<0]*(-1)
+  perm.density = density(mi.perm[1:length(mi.perm)],kernel = "gaussian")
   
-  return(list(DELTA=mi,PVAL=pval))
+  b = mean(perm.density$x)
+  c = sqrt(var(perm.density$x))
+
+  pval1 = apply(mi[1:length(mi)] < mi.perm,c(1,2),sum)/(nboot**2-nboot) # higher
+  pval2 = apply(mi[1:length(mi)] > mi.perm,c(1,2),sum)/(nboot**2-nboot) # lower
+  
+  pval1[pval1==0] = pnorm(mi[pval1==0], mean = b, sd = c, lower.tail = F)
+  pval2[pval2==0] = pnorm(mi[pval2==0], mean = b, sd = c, lower.tail = T)        
+
+  pval2[pval2>pval1] = pval1[pval2>pval1] 
+  #pval1[pval1>pval2] = pval2[pval1>pval2]
+  
+  return(list(DELTA=mi,PVAL=pval2))
 }
 
-mindy2 = function(mexp,mod,tf,target,nbins=5,h=0,nboot=100,perm=F,siglev=0.05,method="MI",verbose=T) {
+mindy2 = function(mexp,mod,tf,target,nbins=5,h=0,nboot=100,perm=F,siglev=0.05,method="MI",verbose=T,scale=F) {
   if(verbose) {
     print(paste0("Exp Matrix: ",paste0(dim(mexp),collapse="x")))
     print(paste0("Modulator: ",mod))
@@ -170,7 +180,7 @@ cut.outliers = function(mexp) {
   return(mexp)
 }
 
-plot.mod = function(mexp,mod,tf,target,nettarget,fus="",high=true) {
+plot.mod = function(mexp,mod,tf,target,nettarget,fus="",high=TRUE) {
   require(amap)
   # ordino per tf
   mexp=mexp[,order(mexp[tf,])]
