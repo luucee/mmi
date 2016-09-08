@@ -52,13 +52,13 @@ for(tt in names(modlist)) {
   oracle=rbind(oracle,data.frame(TF=tt,MOD=modlist[[tt]]))
 }
 oracle=paste(oracle$MOD,oracle$TF)
-a=t(scale(t(mexp)))
+#a=t(scale(t(mexp)))
 source("mmi2.R")
 # signif dei delta
 out = NULL
 for(mod in modulators) {
   ptm = proc.time()[3]
-  out=rbind(out,mindy2(mexp,mod=mod,tf=tf,target = rownames(mexp),nboot = 100,nbins=3,h=1,siglev=0.01,method="pearson")) # equiv mindy (nbins=3 h=1)
+  out=rbind(out,mindy2(mexp,mod=mod,tf=tf,target = rownames(mexp),nboot = 1000,nbins=3,h=1,siglev=0.01,method="pearson")) # equiv mindy (nbins=3 h=1)
   print(paste0(mod," took ",proc.time()[3]-ptm," sec."))
 }
 save(out,file="out-ATLAS.Rdata")
