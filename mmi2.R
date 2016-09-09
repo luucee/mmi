@@ -97,14 +97,14 @@ mi.split = function(mi,r1,r2) {
   #mi.perm[mi.perm<0] = mi.perm[mi.perm<0]*(-1)
   #perm.density = density(mi.perm[1:length(mi.perm)],kernel = "gaussian")
   
-  b = mean(mi.perm[1:length(mi.perm)])
-  c = sqrt(var(mi.perm[1:length(mi.perm)]))
+  bb = mean(mi.perm[1:length(mi.perm)])
+  cc = sqrt(var(mi.perm[1:length(mi.perm)]))
 
   pval1 = apply(mi[1:length(mi)] < mi.perm,c(1,2),sum)/(nboot**2-nboot) # higher tail
   pval2 = apply(mi[1:length(mi)] > mi.perm,c(1,2),sum)/(nboot**2-nboot) # lower tail
   
-  pval1[pval1==0] = pnorm(mi[pval1==0], mean = b, sd = c, lower.tail = F)
-  pval2[pval2==0] = pnorm(mi[pval2==0], mean = b, sd = c, lower.tail = T)        
+  pval1[pval1==0] = pnorm(mi[pval1==0], mean = bb, sd = cc, lower.tail = F)
+  pval2[pval2==0] = pnorm(mi[pval2==0], mean = bb, sd = cc, lower.tail = T)        
 
   pval2[pval2>pval1] = pval1[pval2>pval1] 
   #pval1[pval1>pval2] = pval2[pval1>pval2]
