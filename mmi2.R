@@ -10,7 +10,7 @@ cohens_d <- function(x, y) {
 }
 
 
-cross.cor <- function(x, y, verbose = TRUE, ncore="all", ...){
+cross.cor <- function(x, y, verbose = TRUE, ncore="all", met="pearson", ...){
   require(doParallel)
   if(ncore=="all"){
     ncore = parallel:::detectCores()
@@ -31,7 +31,6 @@ cross.cor <- function(x, y, verbose = TRUE, ncore="all", ...){
   Msize <- M %/% TM
   corMAT<-foreach(i = 1:TN, .combine='rbind') %:% 
     foreach(j = 1:TM, .combine='cbind') %dopar% {
-      
       s1<-(i-1)*Nsize+1
       e1<-s1+Nsize-1
       s2<-(j-1)*Msize+1
@@ -43,7 +42,7 @@ cross.cor <- function(x, y, verbose = TRUE, ncore="all", ...){
         e2<-M
       }
       #cat(s1,e1,s2,e2,"\n")
-      cor(t(x[s1:e1,]), t(y[s2:e2,]), ...)
+      cor(t(x[s1:e1,]), t(y[s2:e2,]), method = met, ...)
     }
   gc()
   return(corMAT)
@@ -67,8 +66,9 @@ mi.ksampled = function(m,r1,r2,k,nboot=100,method="MI") {
     require(parmigene)
     mi = knnmi.cross(m1,m2)
   } else if (method=="pearson") {
-    mi = abs(cross.cor(m1,m2))
-    #mi = abs(cor(t(m1),t(m2),method = "pearson"))
+    mi = abs(cross.cor(m1,m2,met="pearson"))
+  } else if (method=="spearman") {
+    mi = abs(cross.cor(m1,m2,met="spearman"))
   }
   print(paste0(" mi.ksampled ",proc.time()[3]-ptm," sec."))
   return(mi)
@@ -226,12 +226,13 @@ plot.mod = function(mexp,mod,tf,target,nettarget,fus="",high=TRUE) {
   mhigh = mhigh[!righe %in% tf,]
   print(dim(mhigh))
   print(dim(mlow))
-  
+  cnn=colnames(mlow[,ordtflow])
+  print(cnn[colcollow1[ordtflow]=="Fused"])
   require(heatmap3)
   if(high) {
     rownames(mhigh)=rep("",nrow(mhigh))
     colnames(mhigh)=rep("",ncol(mhigh))
-    ic=heatmap3(mhigh[,ordtfhigh],col=bluered(100),Colv=NA,
+    heatmap3(mhigh[,ordtfhigh],col=bluered(100),Colv=NA,
               #RowSideColors=colrighe,
               #ColSideColors=colcolhigh1[ordtfhigh],
               ColSideWidth=1,
@@ -241,7 +242,7 @@ plot.mod = function(mexp,mod,tf,target,nettarget,fus="",high=TRUE) {
   } else {
     rownames(mlow)=rep("",nrow(mlow))
     colnames(mlow)=rep("",ncol(mlow))
-    ic=heatmap3(mlow[,ordtflow],col=bluered(100),Colv=NA,
+    heatmap3(mlow[,ordtflow],col=bluered(100),Colv=NA,
              #RowSideColors=colrighe,
              #ColSideColors=colcollow1[ordtflow],
              ColSideWidth=1,
@@ -249,5 +250,5 @@ plot.mod = function(mexp,mod,tf,target,nettarget,fus="",high=TRUE) {
              showRowDendro=F,method="ward.D2",legendfun=function(x){image(matrix(0),col=0,axes=F)},
              scale="none",main="Lowest")
   }
-  return(ic)
+  #return(ic)
 }

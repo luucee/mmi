@@ -52,23 +52,26 @@ for(mod in modulators) {
 }
 save(out,file="out-Panglioma.Rdata")
 save(out,file="out-GBM.Rdata")
+save(out,file="out-alltargets-GBM.Rdata")
 load("out-Panglioma.Rdata")
 load("out-GBM.Rdata")
 load("out-bins4-GBM.Rdata")
 load("out-alltargets-GBM.Rdata")
 summary(out)
 
+out=out[order(out$PVAL),]
+
 #out$PVAL = p.adjust(out$PVAL,method = "fdr")
-out.sig = subset(out,(DELTA > 0.45))
+out.sig = subset(out,(PVAL < 0.0000000001))
 nrow(out.sig)
 ntrg = aggregate(out.sig$TRG,by=list(out.sig$MOD,out.sig$TF),function(x) length(unique(x)))
 ntrg[,4] = 0
-ntrg[,5] = aggregate(out.sig$DELTA,by=list(out.sig$MOD,out.sig$TF),mean)[,3]
+ntrg[,5] = aggregate(out.sig$PVAL,by=list(out.sig$MOD,out.sig$TF),mean)[,3]
 
 
 # significativita dei num di target per ogni mod-tf
 outperm = NULL
-for(b in 1:100)  {
+for(b in 1:1000)  {
   ptm = proc.time()[3]
   outp=mindy2(geData,mod=modulators[1],tf=tf,target = targets,nboot = 10000,nbins=3,h=1,perm=T,siglev=0.05,method="pearson")
   outp$B=b
@@ -77,6 +80,7 @@ for(b in 1:100)  {
 }
 save(outperm,file="outperm-Panglioma.Rdata")
 save(outperm,file="outperm-GBM.Rdata")
+save(outperm,file="outperm-alltargets-GBM.Rdata")
 load("outperm-Panglioma.Rdata")
 load("outperm-GBM.Rdata")
 load("outperm-bins4-GBM.Rdata")
@@ -108,6 +112,7 @@ mexp = cut.outliers(geData)
 source("mmi2.R")
 mytf="PPARGC1A" #"ESRRG"
 for (mod in as.character(ntrg$MOD[ntrg$TF==mytf])) {
+  mod="TBC1D4"
   cat(mod,"\n")
   f=out.sig[out.sig$MOD==mod & out.sig$TF==mytf,]
   trg = unique(as.character(f$TRG))

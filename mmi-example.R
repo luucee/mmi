@@ -58,24 +58,72 @@ source("mmi2.R")
 out = NULL
 for(mod in modulators) {
   ptm = proc.time()[3]
-  out=rbind(out,mindy2(mexp,mod=mod,tf=tf,target = rownames(mexp),nboot = 1000,nbins=3,h=1,siglev=0.01,method="pearson")) # equiv mindy (nbins=3 h=1)
+  out=rbind(out,mindy2(mexp,mod=mod,tf=tf,target = rownames(mexp),nboot = 1000,nbins=5,h=1,siglev=0.01,method="pearson")) # equiv mindy (nbins=3 h=1)
   print(paste0(mod," took ",proc.time()[3]-ptm," sec."))
 }
-save(out,file="out-ATLAS.Rdata")
+#save(out,file="out-ATLAS.Rdata")
+#save(out,file="out-ATLAS-5bins.Rdata")
 load("out-ATLAS.Rdata")
-out$PVAL=p.adjust(out$PVAL,method = "fdr")
-out = subset(out,PVAL<0.01 & DELTA>0.4)
-out[order(out$DELTA),]
-out = aggregate(out$DELTA,by=list(out$MOD,out$TF),function(x) max(abs(x)))
+load("out-ATLAS-5bins.Rdata")
+out.sig=out
+out.sig = subset(out,DELTA>0.4)
+f1=unique(paste(out.sig$MOD,out.sig$TF))
+
+out.sig=out.sig[order(out.sig$PVAL),]
+f=c()
+for(i in 1:nrow(out.sig)) {
+  l=paste(out.sig[i,1],out.sig[i,2])
+  if (!l %in% f) {
+    f = c(f,l)
+  }
+}
+P=cumsum(f %in% oracle)/(1:length(f))
+R=cumsum(f %in% oracle)/(length(oracle))
+
+sum(f1 %in% oracle)/length(f1)
+sum(intersect(f1,f) %in% oracle)
+length(f1)
+ntrg = aggregate(out.sig$TRG,by=list(out.sig$MOD,out.sig$TF),function(x) length(unique(x)))
+ntrg[,4] = paste(ntrg[,1],ntrg[,2]) %in% oracle
+ntrg[,5] = aggregate(out.sig$DELTA,by=list(out.sig$MOD,out.sig$TF),mean)[,3]
+ntrg[,6] = aggregate(out.sig$DELTA,by=list(out.sig$MOD,out.sig$TF),var)[,3]
+boxplot(ntrg[ntrg[,4],5],ntrg[!ntrg[,4],5])
+
+
+pr = c()
+rc = c()
+for (d in c(0.1,0.2,0.3,0.4,0.5,0.6,0.7)) {
+  f=paste(out$MOD,out$TF)
+  
+  [abs(out$DELTA)>0]
+  sum(f %in% oracle)/length(oracle)
+  sum(f %in% oracle)/length(f)
+  length(oracle)/(length(tf)*length(modulators))
+  pr=c(pr,P)
+  rc=c(rc,R)
+}
+plot(rc,pr,type="l")
+
+f=f[!duplicated(f)]
+pred = prediction(length(f):1,f %in% oracle)
+perf = performance(pred,measure="prec",x.measure="rec")
+perf = performance(pred,measure="tpr",x.measure="fpr")
+plot(perf)
+
+#out$PVAL=p.adjust(out$PVAL,method = "fdr")
+out.sig = subset(out,abs(DELTA)>0.5)
+nrow(out.sig)
+ntrg = aggregate(out.sig$TRG,by=list(out.sig$MOD,out.sig$TF),function(x) length(unique(x)))
+#ntrg[,4] = aggregate(out.sig$PVAL,by=list(out.sig$MOD,out.sig$TF),mean)[,3]
+ntrg[,4] = abs(aggregate(out.sig$DELTA,by=list(out.sig$MOD,out.sig$TF),max)[,3])
 
 require(ROCR)
 layout(matrix(1:3,nrow=1,ncol=3))
 for (tt in tf) {
-  x = out[out$TF==tt,]
-  f=paste(x$MOD,x$TF)
-  pred = prediction(abs(x$DELTA),f %in% oracle)
+  x = grep(tt,f,value = T)
+  pred = prediction(length(x):1,x %in% oracle)
   perf = performance(pred,measure="prec",x.measure="rec")
-  plot(perf,ylim=c(0,1),xlim=c(0,0.1),main=tt)
+  plot(perf,ylim=c(0,1),xlim=c(0,1),main=tt)
 }
 
 mexps = cut.outliers(mexp)
@@ -100,21 +148,30 @@ ntrg[,5] = aggregate(out.sig$DELTA,by=list(out.sig$MOD,out.sig$TF),mean)[,3]
 
 
 # significativita dei num di target per ogni mod-tf
-outperm = foreach(b=1:100, .combine = "rbind") %dopar% {
-  outp = mindy2(M,mod=modulators[1],tf=tf,target = targets,nboot = 1000,nbins=3,h=1,perm=T,siglev="none",method="pearson")
+outperm = NULL
+for(b in 1:1000)  {
+  ptm = proc.time()[3]
+  outp=mindy2(mexp,mod=modulators[1],tf=tf,target = targets,nboot = 1000,nbins=3,h=1,perm=T,siglev=0.01,method="pearson")
   outp$B=b
-  outp
+  outperm = rbind(outperm,outp)
+  print(paste0(b," boot took ",proc.time()[3]-ptm," sec."))
 }
-save(outperm,file="outperm-ATLAS.Rdata")
+#save(outperm,file="outperm-ATLAS.Rdata")
 load("outperm-ATLAS.Rdata")
 
-outperm.sig = subset(outperm,PVAL<0.1)
+outperm$PVAL = p.adjust(outperm$PVAL,method="fdr")
 
+outperm.sig=subset(outperm,PVAL<0.01)
+nrow(outperm.sig)
 ntrg.perm = aggregate(outperm.sig$TRG,by=list(outperm.sig$MOD,outperm.sig$TF,outperm.sig$B),function(x) length(unique(x)))
+plot(density(ntrg.perm$x))
+ntrg[,4]=0
 for(i in 1:nrow(ntrg)) {
   mod=as.character(ntrg[i,1])
-  tf=as.character(ntrg[i,2])
-  ntrg[i,4] = sum(ntrg[i,3] < ntrg.perm[ntrg.perm$MOD==mod & ntrg.perm$TF==tf,4])/1000
+  tfi=as.character(ntrg[i,2])
+  over=sum(ntrg[i,3] < ntrg.perm[ntrg.perm$MOD==mod & ntrg.perm$TF==tfi,4])
+  cat(i,mod,tfi,over,"\n")
+  ntrg[i,4] = over
 }
 
 colnames(ntrg) = c("MOD","TF","N.TRG","PVAL")
