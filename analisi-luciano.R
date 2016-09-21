@@ -53,22 +53,28 @@ for(mod in modulators) {
 save(out,file="out-Panglioma.Rdata")
 save(out,file="out-GBM.Rdata")
 save(out,file="out-alltargets-GBM.Rdata")
+save(out,file="out-alltargets-Panglioma.Rdata")
 load("out-Panglioma.Rdata")
 load("out-GBM.Rdata")
 load("out-bins4-GBM.Rdata")
 load("out-alltargets-GBM.Rdata")
+load("out-alltargets-Panglioma.Rdata")
 summary(out)
 
 out=out[order(out$PVAL),]
 
 #out$PVAL = p.adjust(out$PVAL,method = "fdr")
-out.sig = subset(out,(PVAL < 0.0000000001))
+#out.sig = subset(out,(PVAL < 0.00000000001))
+out.sig = subset(out,DELTA > 0.4)
 nrow(out.sig)
 ntrg = aggregate(out.sig$TRG,by=list(out.sig$MOD,out.sig$TF),function(x) length(unique(x)))
 ntrg[,4] = 0
-ntrg[,5] = aggregate(out.sig$PVAL,by=list(out.sig$MOD,out.sig$TF),mean)[,3]
-
-
+ntrg[,5] = aggregate(out.sig$PVAL,by=list(out.sig$MOD,out.sig$TF),function(x) pchisq(-2 * sum(log(x)),df=2*length(x),lower=F))[,3]
+#ntrg[,5] = aggregate(out.sig$PVAL,by=list(out.sig$MOD,out.sig$TF),function(x) max(x))[,3]
+ntrg[order(ntrg[,5]),][1:10,]
+x=c(0.01),0.03,0.02)
+x=x[1]
+pchisq(-2 * sum(log(x)),df=2*length(x),lower=FALSE)
 # significativita dei num di target per ogni mod-tf
 outperm = NULL
 for(b in 1:1000)  {
@@ -110,17 +116,17 @@ write.xlsx(ntrg,file="modlist.xls",row.names = F,sheetName = "Panglioma" ,append
 mexp = cut.outliers(geData)
 
 source("mmi2.R")
-mytf="PPARGC1A" #"ESRRG"
+mytf="TP53" #"ESRRG"
 for (mod in as.character(ntrg$MOD[ntrg$TF==mytf])) {
-  mod="TBC1D4"
+  #mod="TBC1D4"
   cat(mod,"\n")
   f=out.sig[out.sig$MOD==mod & out.sig$TF==mytf,]
   trg = unique(as.character(f$TRG))
   cat(length(trg),"\n")
-  if (length(trg)>=10) {
+  if (length(trg)>=20) {
     fhigh=paste0(mytf,"-",mod,"-high")
     flow=paste0(mytf,"-",mod,"-low")
-    con=file(description = paste0("outfigs/HIGH-",mytf,"-",mod,".tex"), open = "w")
+    con=file(description = paste0("outfigs2/LOW-",mytf,"-",mod,".tex"), open = "w")
     writeLines('\\documentclass[margin=5mm]{standalone}',con)
     writeLines('\\usepackage{graphics}',con)
     writeLines('\\usepackage{helvet}',con)

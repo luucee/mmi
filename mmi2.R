@@ -9,6 +9,32 @@ cohens_d <- function(x, y) {
   return(cd)
 }
 
+aracne2 = function(mexp,from,to,nboot=1000) {
+  require(parmigene)
+  pb = txtProgressBar(min=1,max=nboot,style=3)
+  mi = knnmi.cross(mexp[from,],mexp[to,])
+  mi.perm = array(0,dim=c(nrow(mi),ncol(mi),nboot))
+  for (i in 1:nboot) {
+    mi.perm[,,i] = knnmi.cross(mexp[from,],mexp[to,sample(1:ncol(mexp))])
+    setTxtProgressBar(pb, i)
+  }
+  
+  pval = apply(mi[1:length(mi)] < mi.perm,c(1,2),sum)/nboot # higher tail
+  rates = 1/apply(mi.perm,c(1,2),mean)
+  
+  mi0 = mi[pval==0]
+  ra0 = rates[pval==0]
+  pval[pval==0] = sapply(1:length(mi0),function(i) pexp(mi0[i],rate=ra0[i],lower.tail = F))
+  
+  pval.fdr = p.adjust(pval,method = "fdr")
+  mi[pval.fdr<=0.05] = 0
+  
+  mi = aracne.a(mi)
+  close(pb)
+  return(mi)
+}
+
+
 
 cross.cor <- function(x, y, verbose = TRUE, ncore="all", met="pearson", ...){
   require(doParallel)
@@ -217,11 +243,17 @@ plot.mod = function(mexp,mod,tf,target,nettarget,fus="",high=TRUE) {
   colcollow1[colnames(mlow) %in% fus] = "Fused"
   colcolhigh1=as.factor(colcolhigh1)
   colcollow1=as.factor(colcollow1)
-  
+  if (fus!="") {
   tfhigh=data.frame(colcolhigh1[ordtfhigh],mhigh[tf,ordtfhigh])
   colnames(tfhigh)=c("TACC3-FGFR3",tf)
   tflow=data.frame(colcollow1[ordtflow],mlow[tf,ordtflow])
   colnames(tflow)=c("TACC3-FGFR3",tf)
+  } else {
+    tfhigh=data.frame(mhigh[tf,ordtfhigh])
+    colnames(tfhigh)=c(tf)
+    tflow=data.frame(mlow[tf,ordtflow])
+    colnames(tflow)=c(tf)
+  }
   mlow = mlow[!righe %in% tf,]
   mhigh = mhigh[!righe %in% tf,]
   print(dim(mhigh))

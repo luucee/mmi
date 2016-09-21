@@ -12,14 +12,44 @@ source("mmi2.R")
 load(file="ATLAS_dataset.Rdata",verbose=T)
 mexp=mexp[rownames(mexp)!="NA",]
 
-# Recupero goldstandard dalle tabelle del paper
-t = read.table("tf-modulators-targets.txt",sep="\t",stringsAsFactors = F)
-t$V2 = gsub("[ |\\n|\\r]","",t$V2)
-t$V3 = gsub("[ |\\n|\\r]","",t$V3)
-trg=strsplit(t$V2,",")
-names(trg) = t$V1
-modlist=strsplit(t$V3,",")
-names(modlist) = t$V1
+
+# recupero gold standard paper cindy (chiesto all'autore F. Giorgi)
+library(org.Hs.eg.db)
+library(annotate)
+d=read.table("federico-giorgi/unionset.txt",sep="\t",header=F)
+g1=getSYMBOL(as.character(d[,1]),data="org.Hs.eg")
+g2=getSYMBOL(as.character(d[,2]),data="org.Hs.eg")
+
+require(xlsx)
+ts3.mod = as.character(read.xlsx("federico-giorgi/Table_S3.xlsx",sheetName = "Modulators")[,1])
+ts3.tf = as.character(read.xlsx("federico-giorgi/Table_S3.xlsx",sheetName = "TFs")[,1])
+length(ts3.mod)
+
+tf1 = which(g1 %in% ts3.tf)
+tf2 = which(g2 %in% ts3.tf)
+
+mod = c(g2[tf1],g1[tf2])
+tf = c(g1[tf1],g2[tf2])
+
+mod.tf = data.frame(MOD=mod,TF=tf,stringsAsFactors = F)
+nrow(mod.tf)
+mod.tf = subset(mod.tf,MOD %in% ts3.mod & TF %in% ts3.tf)
+nrow(mod.tf)
+length(unique(paste(mod.tf$MOD,mod.tf$TF)))
+
+mod.tf = subset(mod.tf,MOD %in% rownames(mexp) & TF %in% rownames(mexp))
+nrow(mod.tf)
+oracle=paste(mod.tf$MOD,mod.tf$TF)
+
+# Recupero goldstandard dalle tabelle del paper Di Bernardo (dubbi)
+#t = read.table("tf-modulators-targets.txt",sep="\t",stringsAsFactors = F)
+#t$V2 = gsub("[ |\\n|\\r]","",t$V2)
+#t$V3 = gsub("[ |\\n|\\r]","",t$V3)
+#trg=strsplit(t$V2,",")
+#names(trg) = t$V1
+#modlist=strsplit(t$V3,",")
+#names(modlist) = t$V1
+
 
 #t=read.table("pathways-genes.txt",sep="\t",header=F,stringsAsFactors = F)
 #pwg=strsplit(t$V2,", ")
@@ -30,6 +60,11 @@ names(modlist) = t$V1
 #tfmodulators = tfpw
 #tfmodulators = lapply(tfmodulators, function(x) unique(unlist(pwg[x])))
 
+source("mmi2.R")
+
+# rimozione relazione mod-tf dirette
+m = aracne2(mexp,mod.tf$MOD,mod.tf$TF)
+
 # rimozione probe con poca variabilita'
 #iqr <- apply(mexp, 1, IQR, na.rm = TRUE)
 #var.cutoff = quantile(iqr, 0.1, na.rm=TRUE) # percentuale che ne butta fuori
@@ -39,34 +74,86 @@ names(modlist) = t$V1
 #dim(M)
 
 # prova con tf dell'oracolo
-tf = names(trg)
-modulators = unique(unlist(modlist))
-targets = unique(unlist(trg))
-targets=targets[targets %in% rownames(mexp)]
-modulators=modulators[modulators %in% rownames(mexp)]
-for (tt in names(modlist)) { # per l'oracolo solo quelli che esistono nei dati
-  modlist[[tt]] = modlist[[tt]][modlist[[tt]] %in% modulators]
-}
-oracle=NULL
-for(tt in names(modlist)) {
-  oracle=rbind(oracle,data.frame(TF=tt,MOD=modlist[[tt]]))
-}
-oracle=paste(oracle$MOD,oracle$TF)
+tf = unique(mod.tf$TF)
+modulators = unique(mod.tf$MOD)
+targets = setdiff(rownames(mexp),c(tf,mod))
 #a=t(scale(t(mexp)))
-source("mmi2.R")
+
 # signif dei delta
 out = NULL
 for(mod in modulators) {
   ptm = proc.time()[3]
-  out=rbind(out,mindy2(mexp,mod=mod,tf=tf,target = rownames(mexp),nboot = 1000,nbins=5,h=1,siglev=0.01,method="pearson")) # equiv mindy (nbins=3 h=1)
+  tf1 = names(m[mod,m[mod,]>0])
+  out=rbind(out,mindy2(mexp,mod=mod,tf=tf1,target = rownames(mexp),nboot = 1000,nbins=3,h=1,siglev="none",method="spearman")) # equiv mindy (nbins=3 h=1)
   print(paste0(mod," took ",proc.time()[3]-ptm," sec."))
 }
 #save(out,file="out-ATLAS.Rdata")
 #save(out,file="out-ATLAS-5bins.Rdata")
+#save(out,file="out-ATLAS-spearman.Rdata")
 load("out-ATLAS.Rdata")
 load("out-ATLAS-5bins.Rdata")
-out.sig=out
-out.sig = subset(out,DELTA>0.4)
+load("out-ATLAS-spearman.Rdata")
+out$PVAL = p.adjust(out$PVAL,method="bonferroni")
+
+out.sig=subset(out,abs(DELTA) > 0.4)
+ntrg = aggregate(out.sig$TRG,by=list(out.sig$MOD,out.sig$TF),function(x) length(unique(x)))
+ntrg[,4] = aggregate(out.sig$PVAL,by=list(out.sig$MOD,out.sig$TF),function(x) pchisq(-2 * sum(log(x)),df=2*length(x),lower=F))[,3]
+ntrg[,4] = aggregate(out.sig$DELTA,by=list(out.sig$MOD,out.sig$TF),max)[,3]
+ntrg[,5] = paste(ntrg[,1],ntrg[,2]) %in% oracle
+
+require(ROCR)
+tt = c("TP53")
+for (tt in tf) {
+  #ntrg.tf = ntrg[ntrg[,2]==tt,]
+  ntrg.tf = ntrg
+  pred = prediction(log(ntrg.tf[,4]),ntrg.tf[,5])
+  pred = prediction(log(ntrg.tf[,3]),ntrg.tf[,5])
+  perf = performance(pred,measure="prec",x.measure="rec")
+  #perf = performance(pred,measure="tpr",x.measure="fpr")
+  pdf(paste0("PR2-",tt,".pdf"))
+  plot(perf,main=tt,lwd=5,col=2)
+  grid()
+  dev.off()
+}
+
+mexp = cut.outliers(mexp)
+
+mytf="TP53"
+for(mod in as.character(ntrg[ntrg[,2]==mytf,1])) {
+  f=out.sig[out.sig$MOD==mod & out.sig$TF==mytf,]
+  trg = unique(as.character(f$TRG))
+  if (length(trg)<50 | !paste(mod,tt) %in% oracle) {
+    cat(length(trg),"\n")
+    next
+  }
+  fhigh=paste0(mytf,"-",mod,"-high")
+  flow=paste0(mytf,"-",mod,"-low")
+  con=file(description = paste0("outfigs2/LOW-",mytf,"-",mod,".tex"), open = "w")
+  writeLines('\\documentclass[margin=5mm]{standalone}',con)
+  writeLines('\\usepackage{graphics}',con)
+  writeLines('\\usepackage{helvet}',con)
+  writeLines('\\begin{document}',con)
+  writeLines('\\begin{tabular}{cc}',con)
+  writeLines(paste0('\\multicolumn{2}{c}{{{\\fontfamily{phv}\\selectfont {\\huge ',mod,' }}}}\\\\'),con)
+  writeLines(paste0('\\includegraphics{',flow,'} &'),con)
+  writeLines(paste0('\\includegraphics{',fhigh,'} \\\\'),con)
+  writeLines('\\end{tabular}',con)
+  writeLines('\\end{document}',con)
+  close(con)
+  
+  pdf(paste0("outfigs2/",fhigh,".pdf"))
+  plot.mod(mexp,mod,mytf,target = trg,
+           nettarget = trg,fus="",high=T)
+  dev.off()
+  pdf(paste0("outfigs2/",flow,".pdf"))
+  plot.mod(mexp,mod,mytf,target = trg,
+           nettarget = trg,fus="",high=F)
+  dev.off()
+}
+
+
+x=out.sig[out.sig$TF==mytf,]
+out.sig = subset(out,DELTA>0.6)
 f1=unique(paste(out.sig$MOD,out.sig$TF))
 
 out.sig=out.sig[order(out.sig$PVAL),]
@@ -79,14 +166,12 @@ for(i in 1:nrow(out.sig)) {
 }
 P=cumsum(f %in% oracle)/(1:length(f))
 R=cumsum(f %in% oracle)/(length(oracle))
-
+plot(R,P,type="l")
 sum(f1 %in% oracle)/length(f1)
 sum(intersect(f1,f) %in% oracle)
 length(f1)
 ntrg = aggregate(out.sig$TRG,by=list(out.sig$MOD,out.sig$TF),function(x) length(unique(x)))
-ntrg[,4] = paste(ntrg[,1],ntrg[,2]) %in% oracle
-ntrg[,5] = aggregate(out.sig$DELTA,by=list(out.sig$MOD,out.sig$TF),mean)[,3]
-ntrg[,6] = aggregate(out.sig$DELTA,by=list(out.sig$MOD,out.sig$TF),var)[,3]
+
 boxplot(ntrg[ntrg[,4],5],ntrg[!ntrg[,4],5])
 
 
