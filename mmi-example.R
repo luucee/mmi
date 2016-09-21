@@ -1,4 +1,3 @@
-source("mmi2.R")
 
 # Dataset lavoro Gambardella et al. BMC Bioinformatics (2015) 16:279
 #require(R.matlab)
