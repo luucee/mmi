@@ -9,7 +9,7 @@ cohens_d <- function(x, y) {
   return(cd)
 }
 
-aracne2 = function(mexp,from,to,nboot=1000) {
+aracne2 = function(mexp,from,to,nboot=1000,DPI=TRUE) {
   require(parmigene)
   pb = txtProgressBar(min=1,max=nboot,style=3)
   mi = knnmi.cross(mexp[from,],mexp[to,])
@@ -29,7 +29,24 @@ aracne2 = function(mexp,from,to,nboot=1000) {
   pval.fdr = p.adjust(pval,method = "fdr")
   mi[pval.fdr<=0.05] = 0
   
-  mi = aracne.a(mi)
+  if (DPI) {
+    commong = intersect(from,to)
+    onlyfrom = setdiff(from,to)
+    onlyto = setdiff(to,from)
+    extn = nrow=length(commong)+length(onlyfrom)+length(onlyto)
+    extmi = matrix(0,nrow=extn,ncol=extn)
+    rownames(extmi) = c(commong,onlyto,onlyfrom)
+    colnames(extmi) = c(commong,onlyto,onlyfrom)
+    extmi[commong,commong] = mi[commong,commong]
+    extmi[onlyto,commong] = t(mi[commong,onlyto])
+    extmi[onlyfrom,commong] = mi[onlyfrom,commong]
+    extmi[commong,onlyfrom] = t(mi[onlyfrom,commong])
+    extmi[onlyto,onlyfrom] = t(mi[onlyfrom,onlyto])
+    extmi[commong,onlyto] = mi[commong,onlyto]
+    extmi[onlyfrom,onlyto] = mi[onlyfrom,onlyto]
+    extmi = aracne.a(extmi)
+    mi = extmi[from,to]
+  }
   close(pb)
   return(mi)
 }

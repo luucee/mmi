@@ -10,7 +10,14 @@
 #save(tf,modulators,allgenes,mexp,file="ATLAS_dataset.Rdata")
 load(file="ATLAS_dataset.Rdata",verbose=T)
 mexp=mexp[rownames(mexp)!="NA",]
+dim(mexp)
 
+# rimozione probe con poca variabilita'
+iqr <- apply(mexp, 1, IQR, na.rm = TRUE)
+var.cutoff = quantile(iqr, 0.4, na.rm=TRUE) # percentuale che ne butta fuori
+selected = iqr > var.cutoff
+mexp <- mexp[selected, ]
+dim(mexp)
 
 # recupero gold standard paper cindy (chiesto all'autore F. Giorgi)
 library(org.Hs.eg.db)
@@ -39,6 +46,7 @@ length(unique(paste(mod.tf$MOD,mod.tf$TF)))
 mod.tf = subset(mod.tf,MOD %in% rownames(mexp) & TF %in% rownames(mexp))
 nrow(mod.tf)
 oracle=paste(mod.tf$MOD,mod.tf$TF)
+length(oracle)
 
 # Recupero goldstandard dalle tabelle del paper Di Bernardo (dubbi)
 #t = read.table("tf-modulators-targets.txt",sep="\t",stringsAsFactors = F)
@@ -61,22 +69,18 @@ oracle=paste(mod.tf$MOD,mod.tf$TF)
 
 source("mmi2.R")
 
-# rimozione relazione mod-tf dirette
-m = aracne2(mexp,mod.tf$MOD,mod.tf$TF)
 
-# rimozione probe con poca variabilita'
-#iqr <- apply(mexp, 1, IQR, na.rm = TRUE)
-#var.cutoff = quantile(iqr, 0.1, na.rm=TRUE) # percentuale che ne butta fuori
-#selected = iqr > var.cutoff
-#M <- mexp[selected, ]
-#M <- mexp
-#dim(M)
+
+
 
 # prova con tf dell'oracolo
 tf = unique(mod.tf$TF)
 modulators = unique(mod.tf$MOD)
 targets = setdiff(rownames(mexp),c(tf,mod))
 #a=t(scale(t(mexp)))
+
+# rimozione relazione mod-tf dirette
+m = aracne2(mexp,modulators,tf,nboot=100)
 
 # signif dei delta
 out = NULL
