@@ -11,7 +11,7 @@ cohens_d <- function(x, y) {
 
 aracne2 = function(mexp,from,to,nperm=1000,DPI=TRUE) {
   require(parmigene)
-  pb = txtProgressBar(min=1,max=nboot,style=3)
+  pb = txtProgressBar(min=1,max=nperm,style=3)
   mi = knnmi.cross(mexp[from,],mexp[to,])
   mi.perm = array(0,dim=c(nrow(mi),ncol(mi)))
   rates = array(0,dim=c(nrow(mi),ncol(mi)))
