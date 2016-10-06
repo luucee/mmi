@@ -86,8 +86,8 @@ m = aracne2(mexp,modulators,tf,nboot=100)
 out = NULL
 for(mod in modulators) {
   ptm = proc.time()[3]
-  tf1 = names(m[mod,m[mod,]>0])
-  out=rbind(out,mindy2(mexp,mod=mod,tf=tf1,target = rownames(mexp),nboot = 1000,nbins=3,h=1,siglev="none",method="spearman")) # equiv mindy (nbins=3 h=1)
+  tf1 = names(m[mod,m[mod,]<=0])
+  out=rbind(out,mindy2(mexp,mod=mod,tf=tf1,target = targets ,nboot = 1000,nbins=3,h=1,siglev="none",method="spearman")) # equiv mindy (nbins=3 h=1)
   print(paste0(mod," took ",proc.time()[3]-ptm," sec."))
 }
 #save(out,file="out-ATLAS.Rdata")

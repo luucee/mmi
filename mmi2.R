@@ -9,46 +9,49 @@ cohens_d <- function(x, y) {
   return(cd)
 }
 
-aracne2 = function(mexp,from,to,nboot=1000,DPI=TRUE) {
+aracne2 = function(mexp,from,to,nperm=1000,DPI=TRUE) {
   require(parmigene)
   pb = txtProgressBar(min=1,max=nboot,style=3)
   mi = knnmi.cross(mexp[from,],mexp[to,])
-  mi.perm = array(0,dim=c(nrow(mi),ncol(mi),nboot))
-  for (i in 1:nboot) {
-    mi.perm[,,i] = knnmi.cross(mexp[from,],mexp[to,sample(1:ncol(mexp))])
+  mi.perm = array(0,dim=c(nrow(mi),ncol(mi)))
+  rates = array(0,dim=c(nrow(mi),ncol(mi)))
+  for (i in 1:nperm) {
+    mi.tmp = knnmi.cross(mexp[from,],mexp[to,sample(1:ncol(mexp))])
+    mi.perm = mi.perm + (mi < mi.tmp)
+    rates = rates + mi.tmp
     setTxtProgressBar(pb, i)
   }
   
-  pval = apply(mi[1:length(mi)] < mi.perm,c(1,2),sum)/nboot # higher tail
-  rates = 1/apply(mi.perm,c(1,2),mean)
+  pval = mi.perm/nperm # higher tail
+  rates = nperm/rates
   
   mi0 = mi[pval==0]
   ra0 = rates[pval==0]
   pval[pval==0] = sapply(1:length(mi0),function(i) pexp(mi0[i],rate=ra0[i],lower.tail = F))
   
-  pval.fdr = p.adjust(pval,method = "fdr")
-  mi[pval.fdr<=0.05] = 0
+  #pval.fdr = p.adjust(pval,method = "fdr")
+  #mi[pval.fdr<=0.05] = 0
   
   if (DPI) {
     commong = intersect(from,to)
     onlyfrom = setdiff(from,to)
     onlyto = setdiff(to,from)
-    extn = nrow=length(commong)+length(onlyfrom)+length(onlyto)
+    extn = length(commong)+length(onlyfrom)+length(onlyto)
     extmi = matrix(0,nrow=extn,ncol=extn)
     rownames(extmi) = c(commong,onlyto,onlyfrom)
     colnames(extmi) = c(commong,onlyto,onlyfrom)
-    extmi[commong,commong] = mi[commong,commong]
-    extmi[onlyto,commong] = t(mi[commong,onlyto])
-    extmi[onlyfrom,commong] = mi[onlyfrom,commong]
-    extmi[commong,onlyfrom] = t(mi[onlyfrom,commong])
-    extmi[onlyto,onlyfrom] = t(mi[onlyfrom,onlyto])
-    extmi[commong,onlyto] = mi[commong,onlyto]
-    extmi[onlyfrom,onlyto] = mi[onlyfrom,onlyto]
+    extmi[commong,commong] = mi[commong,commong,drop=FALSE]
+    extmi[onlyto,commong] = t(mi[commong,onlyto,drop=FALSE])
+    extmi[onlyfrom,commong] = mi[onlyfrom,commong,drop=FALSE]
+    extmi[commong,onlyfrom] = t(mi[onlyfrom,commong,drop=FALSE])
+    extmi[onlyto,onlyfrom] = t(mi[onlyfrom,onlyto,drop=FALSE])
+    extmi[commong,onlyto] = mi[commong,onlyto,drop=FALSE]
+    extmi[onlyfrom,onlyto] = mi[onlyfrom,onlyto,drop=FALSE]
     extmi = aracne.a(extmi)
     mi = extmi[from,to]
   }
   close(pb)
-  return(mi)
+  return(list(MI=mi,PVAL=pval))
 }
 
 
@@ -85,7 +88,7 @@ cross.cor <- function(x, y, verbose = TRUE, ncore="all", met="pearson", ...){
         e2<-M
       }
       #cat(s1,e1,s2,e2,"\n")
-      cor(t(x[s1:e1,]), t(y[s2:e2,]), method = met, ...)
+      cor(t(x[s1:e1,]), t(y[s2:e2,]), method = met, use="pairwise.complete.obs", ...)
     }
   gc()
   return(corMAT)
@@ -110,8 +113,10 @@ mi.ksampled = function(m,r1,r2,k,nboot=100,method="MI") {
     mi = knnmi.cross(m1,m2)
   } else if (method=="pearson") {
     mi = abs(cross.cor(m1,m2,met="pearson"))
+    mi[is.na(mi)] = 0
   } else if (method=="spearman") {
     mi = abs(cross.cor(m1,m2,met="spearman"))
+    mi[is.na(mi)] = 0
   }
   print(paste0(" mi.ksampled ",proc.time()[3]-ptm," sec."))
   return(mi)
@@ -136,16 +141,13 @@ mi.split = function(mi,r1,r2) {
   }
   mi.boot[,,nboot] = mi[1:l1 +l1*(nboot-1),1:l2 + l2*(nboot-1)]
   mi = apply(mi.boot,c(1,2),mean)
-  
-  #mi.perm[mi.perm<0] = mi.perm[mi.perm<0]*(-1)
-  #perm.density = density(mi.perm[1:length(mi.perm)],kernel = "gaussian")
-  
+
   bb = mean(mi.perm[1:length(mi.perm)])
   cc = sqrt(var(mi.perm[1:length(mi.perm)]))
 
   pval1 = apply(mi[1:length(mi)] < mi.perm,c(1,2),sum)/(nboot**2-nboot) # higher tail
   pval2 = apply(mi[1:length(mi)] > mi.perm,c(1,2),sum)/(nboot**2-nboot) # lower tail
-  
+
   pval1[pval1==0] = pnorm(mi[pval1==0], mean = bb, sd = cc, lower.tail = F)
   pval2[pval2==0] = pnorm(mi[pval2==0], mean = bb, sd = cc, lower.tail = T)        
 
@@ -215,14 +217,14 @@ mindy2 = function(mexp,mod,tf,target,nbins=5,h=0,nboot=100,perm=F,siglev=0.05,me
 
 cut.outliers = function(mexp) {
   for(i in 1:nrow(mexp)){
-    mexp[i,] = (mexp[i,]-mean(mexp[i,]))/sd(mexp[i,])
+    mexp[i,] = (mexp[i,]-mean(mexp[i,]))/sd(mexp[i,],na.rm = T)
   }
-  mexp[mexp <= quantile(mexp, 0.05)] = quantile(mexp, 0.05)
-  mexp[mexp >= quantile(mexp, 0.95)] = quantile(mexp, 0.95)
+  mexp[mexp <= quantile(mexp, 0.05,na.rm = T)] = quantile(mexp, 0.05,na.rm = T)
+  mexp[mexp >= quantile(mexp, 0.95,na.rm = T)] = quantile(mexp, 0.95,na.rm = T)
   return(mexp)
 }
 
-plot.mod = function(mexp,mod,tf,target,nettarget,fus="",high=TRUE) {
+plot.mod = function(mexp,mod,tf,target,nettarget,fus="",high=TRUE,ordmod=order(mexp[mod,],decreasing=T)) {
   require(amap)
   # ordino per tf
   mexp=mexp[,order(mexp[tf,])]
@@ -230,7 +232,6 @@ plot.mod = function(mexp,mod,tf,target,nettarget,fus="",high=TRUE) {
   colortf = crp(100)[cut(mexp[tf,],100,labels=F)]
   
   # ordino per mod
-  ordmod = order(mexp[mod,],decreasing=T)
   colortf = colortf[ordmod]
   mexp = mexp[,ordmod]
   sbinhigh = ncol(mexp) %/% 3
